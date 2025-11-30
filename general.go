@@ -9,7 +9,8 @@ type GeneralUnit struct {
 
 // General contains predefined general dimension units
 var General = struct {
-	Unit GeneralUnit // Base unit for general dimensions
+	Unit    GeneralUnit // Base unit for general dimensions
+	Percent GeneralUnit // Percentage unit
 }{
 	Unit: GeneralUnit{
 		BaseUnit: NewBaseUnit(
@@ -19,6 +20,16 @@ var General = struct {
 			1.0,
 			0.0,
 			true, // Base unit
+		),
+	},
+	Percent: GeneralUnit{
+		BaseUnit: NewBaseUnit(
+			"general",
+			"%",
+			"Percent",
+			0.01, // 1% = 0.01 unit
+			0.0,
+			false,
 		),
 	},
 }

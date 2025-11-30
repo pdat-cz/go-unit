@@ -210,6 +210,28 @@ readingJSON, _ := json.Marshal(reading)
 // readingJSON contains the sensor ID, timestamp, and serialized temperature
 ```
 
+### Compact Serialization
+
+For systems that prefer snake_case keys (e.g., NATS subjects), use the compact format:
+
+```go
+// Compact format: {"value":25,"unit":"temperature_celsius"}
+data, err := unit.MarshalCompactTemperature(temp)
+
+// With symbol included: {"value":25,"unit":"temperature_celsius","symbol":"°C"}
+data, err := unit.MarshalCompactTemperatureWithSymbol(temp)
+
+// Deserialize compact format
+temp, err := unit.UnmarshalCompactTemperature(data)
+```
+
+The generic `UnmarshalMeasurement` function auto-detects the format:
+
+```go
+// Works with both standard and compact formats
+am, err := unit.UnmarshalMeasurement(jsonData)
+```
+
 ## Custom Units
 
 The package supports defining custom units for project-specific needs using the `GeneralUnit` type:

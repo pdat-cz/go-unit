@@ -5,6 +5,8 @@ package unit
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"unicode"
 )
 
 // MeasurementJSON is used for JSON serialization of measurements
@@ -19,6 +21,58 @@ type QuantityJSON struct {
 	Value     float64 `json:"value" yaml:"value"`
 	Unit      string  `json:"unit" yaml:"unit"`
 	Dimension string  `json:"dimension" yaml:"dimension"`
+}
+
+// CompactJSON is used for compact JSON serialization with snake_case unit keys
+type CompactJSON struct {
+	Value  float64 `json:"value"`
+	Unit   string  `json:"unit"`             // "dimension_unitname" format, e.g., "temperature_celsius"
+	Symbol string  `json:"symbol,omitempty"` // optional unit symbol, e.g., "°C"
+}
+
+// toSnakeCase converts a string to snake_case
+// Handles both PascalCase ("KilometersPerHour") and space-separated ("Kilometers per Hour")
+func toSnakeCase(s string) string {
+	// First, replace spaces with underscores
+	s = strings.ReplaceAll(s, " ", "_")
+
+	var result strings.Builder
+	for i, r := range s {
+		if unicode.IsUpper(r) {
+			// Add underscore before uppercase letter if not at start and previous char wasn't underscore
+			if i > 0 && result.Len() > 0 {
+				lastByte := result.String()[result.Len()-1]
+				if lastByte != '_' {
+					result.WriteRune('_')
+				}
+			}
+			result.WriteRune(unicode.ToLower(r))
+		} else if r == '_' {
+			// Avoid double underscores
+			if result.Len() > 0 && result.String()[result.Len()-1] != '_' {
+				result.WriteRune('_')
+			}
+		} else {
+			result.WriteRune(r)
+		}
+	}
+	return result.String()
+}
+
+// unitKey returns a snake_case key combining dimension and unit name
+// e.g., "temperature", "Celsius" -> "temperature_celsius"
+func unitKey(dimension, name string) string {
+	return strings.ToLower(dimension) + "_" + toSnakeCase(name)
+}
+
+// parseUnitKey splits a compact unit key into dimension and unit name
+// e.g., "temperature_celsius" -> "temperature", "celsius"
+func parseUnitKey(key string) (dimension, unitName string) {
+	idx := strings.Index(key, "_")
+	if idx == -1 {
+		return key, ""
+	}
+	return key[:idx], key[idx+1:]
 }
 
 // AnyMeasurement is a wrapper that can hold any type of measurement
@@ -220,6 +274,11 @@ func (am *AnyMeasurement) AsGeneral() (Quantity[GeneralUnit], bool) {
 // UnmarshalMeasurement deserializes a JSON representation to an AnyMeasurement
 // without requiring knowledge of the dimension in advance
 func UnmarshalMeasurement(data []byte) (*AnyMeasurement, error) {
+	// Auto-detect format: compact vs standard
+	if isCompactFormat(data) {
+		return unmarshalCompactMeasurement(data)
+	}
+
 	var jsonM MeasurementJSON
 	if err := json.Unmarshal(data, &jsonM); err != nil {
 		return nil, err
