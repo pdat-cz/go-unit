@@ -174,7 +174,7 @@ func TestUnmarshalMeasurementAutoDetectCompact(t *testing.T) {
 
 func TestUnmarshalMeasurementAutoDetectStandard(t *testing.T) {
 	// Standard format
-	standardData := []byte(`{"value":100,"unit":"m","dimension":"length"}`)
+	standardData := []byte(`{"value":100,"unit":{"name":"Meter","symbol":"m"},"dimension":"length"}`)
 
 	am, err := UnmarshalMeasurement(standardData)
 	if err != nil {
@@ -200,9 +200,9 @@ func TestIsCompactFormat(t *testing.T) {
 		expected bool
 	}{
 		{`{"value":25,"unit":"temperature_celsius"}`, true},
-		{`{"value":25,"unit":"°C","dimension":"temperature"}`, false},
+		{`{"value":25,"unit":{"name":"Celsius","symbol":"°C"},"dimension":"temperature"}`, false},
 		{`{"value":100,"unit":"length_meter"}`, true},
-		{`{"value":100,"unit":"m","dimension":"length"}`, false},
+		{`{"value":100,"unit":{"name":"Meter","symbol":"m"},"dimension":"length"}`, false},
 	}
 
 	for _, tt := range tests {
@@ -412,19 +412,33 @@ func TestMarshalCompactAllDimensions(t *testing.T) {
 		{"Area", func() ([]byte, error) { return MarshalCompactArea(NewArea(100, Area.SquareMeter)) }, "area_square_meter"},
 		{"Volume", func() ([]byte, error) { return MarshalCompactVolume(NewVolume(1, Volume.Liter)) }, "volume_liter"},
 		{"Speed", func() ([]byte, error) { return MarshalCompactSpeed(NewSpeed(100, Speed.KilometersPerHour)) }, "speed_kilometers_per_hour"},
-		{"Acceleration", func() ([]byte, error) { return MarshalCompactAcceleration(NewAcceleration(9.8, Acceleration.MetersPerSecondSquared)) }, "acceleration_meters_per_second_squared"},
+		{"Acceleration", func() ([]byte, error) {
+			return MarshalCompactAcceleration(NewAcceleration(9.8, Acceleration.MetersPerSecondSquared))
+		}, "acceleration_meters_per_second_squared"},
 		{"FlowRate", func() ([]byte, error) { return MarshalCompactFlowRate(NewFlowRate(10, FlowRate.CubicMetersPerHour)) }, "flowrate_cubic_meters_per_hour"},
 		{"Power", func() ([]byte, error) { return MarshalCompactPower(NewPower(1000, Power.Watt)) }, "power_watt"},
 		{"Energy", func() ([]byte, error) { return MarshalCompactEnergy(NewEnergy(3600, Energy.Joule)) }, "energy_joule"},
-		{"Concentration", func() ([]byte, error) { return MarshalCompactConcentration(NewConcentration(5, Concentration.GramsPerLiter)) }, "concentration_grams_per_liter"},
-		{"Dispersion", func() ([]byte, error) { return MarshalCompactDispersion(NewDispersion(100, Dispersion.PartsPerMillion)) }, "dispersion_parts_per_million"},
-		{"ElectricCharge", func() ([]byte, error) { return MarshalCompactElectricCharge(NewElectricCharge(1, ElectricCharge.Coulomb)) }, "electric_charge_coulomb"},
-		{"ElectricCurrent", func() ([]byte, error) { return MarshalCompactElectricCurrent(NewElectricCurrent(1, ElectricCurrent.Ampere)) }, "electric_current_ampere"},
-		{"ElectricPotentialDifference", func() ([]byte, error) { return MarshalCompactElectricPotentialDifference(NewElectricPotentialDifference(220, ElectricPotentialDifference.Volt)) }, "electric_potential_difference_volt"},
+		{"Concentration", func() ([]byte, error) {
+			return MarshalCompactConcentration(NewConcentration(5, Concentration.GramsPerLiter))
+		}, "concentration_grams_per_liter"},
+		{"Dispersion", func() ([]byte, error) {
+			return MarshalCompactDispersion(NewDispersion(100, Dispersion.PartsPerMillion))
+		}, "dispersion_parts_per_million"},
+		{"ElectricCharge", func() ([]byte, error) {
+			return MarshalCompactElectricCharge(NewElectricCharge(1, ElectricCharge.Coulomb))
+		}, "electric_charge_coulomb"},
+		{"ElectricCurrent", func() ([]byte, error) {
+			return MarshalCompactElectricCurrent(NewElectricCurrent(1, ElectricCurrent.Ampere))
+		}, "electric_current_ampere"},
+		{"ElectricPotentialDifference", func() ([]byte, error) {
+			return MarshalCompactElectricPotentialDifference(NewElectricPotentialDifference(220, ElectricPotentialDifference.Volt))
+		}, "electric_potential_difference_volt"},
 		{"Frequency", func() ([]byte, error) { return MarshalCompactFrequency(NewFrequency(1000, Frequency.Hertz)) }, "frequency_hertz"},
 		{"Illuminance", func() ([]byte, error) { return MarshalCompactIlluminance(NewIlluminance(500, Illuminance.Lux)) }, "illuminance_lux"},
 		{"Information", func() ([]byte, error) { return MarshalCompactInformation(NewInformation(1024, Information.Byte)) }, "information_byte"},
-		{"FuelEfficiency", func() ([]byte, error) { return MarshalCompactFuelEfficiency(NewFuelEfficiency(15, FuelEfficiency.KilometersPerLiter)) }, "fuel_efficiency_kilometers_per_liter"},
+		{"FuelEfficiency", func() ([]byte, error) {
+			return MarshalCompactFuelEfficiency(NewFuelEfficiency(15, FuelEfficiency.KilometersPerLiter))
+		}, "fuel_efficiency_kilometers_per_liter"},
 	}
 
 	for _, tt := range tests {

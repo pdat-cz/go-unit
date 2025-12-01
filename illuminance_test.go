@@ -108,8 +108,12 @@ func TestIlluminanceSerialization(t *testing.T) {
 	if jsonData["value"].(float64) != 1000.0 {
 		t.Errorf("Expected value to be 1000.0, got %f", jsonData["value"].(float64))
 	}
-	if jsonData["unit"].(string) != "lx" {
-		t.Errorf("Expected unit to be lx, got %s", jsonData["unit"].(string))
+	unitData := jsonData["unit"].(map[string]interface{})
+	if unitData["symbol"].(string) != "lx" {
+		t.Errorf("Expected unit symbol to be lx, got %s", unitData["symbol"].(string))
+	}
+	if unitData["name"].(string) != "Lux" {
+		t.Errorf("Expected unit name to be Lux, got %s", unitData["name"].(string))
 	}
 	if jsonData["dimension"].(string) != "illuminance" {
 		t.Errorf("Expected dimension to be illuminance, got %s", jsonData["dimension"].(string))

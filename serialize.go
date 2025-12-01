@@ -9,11 +9,17 @@ import (
 	"unicode"
 )
 
+// UnitJSON is used for JSON serialization of units
+type UnitJSON struct {
+	Name   string `json:"name" yaml:"name"`
+	Symbol string `json:"symbol" yaml:"symbol"`
+}
+
 // MeasurementJSON is used for JSON serialization of measurements
 type MeasurementJSON struct {
-	Value     float64 `json:"value" yaml:"value"`
-	Unit      string  `json:"unit" yaml:"unit"`
-	Dimension string  `json:"dimension" yaml:"dimension"`
+	Value     float64  `json:"value" yaml:"value"`
+	Unit      UnitJSON `json:"unit" yaml:"unit"`
+	Dimension string   `json:"dimension" yaml:"dimension"`
 }
 
 // QuantityJSON is a non-generic struct used for JSON serialization
@@ -472,8 +478,11 @@ func fallbackToGeneral(data []byte, jsonM MeasurementJSON, originalErr error) (*
 // marshalGeneric is a helper function to serialize any measurement to JSON
 func marshalGeneric[T Category](m Quantity[T]) ([]byte, error) {
 	return json.Marshal(MeasurementJSON{
-		Value:     m.Value,
-		Unit:      m.Unit.Symbol(),
+		Value: m.Value,
+		Unit: UnitJSON{
+			Name:   m.Unit.Name(),
+			Symbol: m.Unit.Symbol(),
+		},
 		Dimension: m.Unit.Dimension(),
 	})
 }
@@ -499,7 +508,7 @@ func UnmarshalTemperature(data []byte) (Quantity[TemperatureUnit], error) {
 	var unit TemperatureUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "°C", "C":
 		unit = Temperature.Celsius
 		found = true
@@ -512,7 +521,7 @@ func UnmarshalTemperature(data []byte) (Quantity[TemperatureUnit], error) {
 	}
 
 	if !found {
-		return Quantity[TemperatureUnit]{}, fmt.Errorf("unknown temperature unit: %s", jsonM.Unit)
+		return Quantity[TemperatureUnit]{}, fmt.Errorf("unknown temperature unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewTemperature(jsonM.Value, unit), nil
@@ -539,7 +548,7 @@ func UnmarshalPressure(data []byte) (Quantity[PressureUnit], error) {
 	var unit PressureUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "Pa":
 		unit = Pressure.Pascal
 		found = true
@@ -558,7 +567,7 @@ func UnmarshalPressure(data []byte) (Quantity[PressureUnit], error) {
 	}
 
 	if !found {
-		return Quantity[PressureUnit]{}, fmt.Errorf("unknown pressure unit: %s", jsonM.Unit)
+		return Quantity[PressureUnit]{}, fmt.Errorf("unknown pressure unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewPressure(jsonM.Value, unit), nil
@@ -585,7 +594,7 @@ func UnmarshalFlowRate(data []byte) (Quantity[FlowRateUnit], error) {
 	var unit FlowRateUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "m³/h":
 		unit = FlowRate.CubicMetersPerHour
 		found = true
@@ -598,7 +607,7 @@ func UnmarshalFlowRate(data []byte) (Quantity[FlowRateUnit], error) {
 	}
 
 	if !found {
-		return Quantity[FlowRateUnit]{}, fmt.Errorf("unknown flowrate unit: %s", jsonM.Unit)
+		return Quantity[FlowRateUnit]{}, fmt.Errorf("unknown flowrate unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewFlowRate(jsonM.Value, unit), nil
@@ -625,7 +634,7 @@ func UnmarshalPower(data []byte) (Quantity[PowerUnit], error) {
 	var unit PowerUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "W":
 		unit = Power.Watt
 		found = true
@@ -638,7 +647,7 @@ func UnmarshalPower(data []byte) (Quantity[PowerUnit], error) {
 	}
 
 	if !found {
-		return Quantity[PowerUnit]{}, fmt.Errorf("unknown power unit: %s", jsonM.Unit)
+		return Quantity[PowerUnit]{}, fmt.Errorf("unknown power unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewPower(jsonM.Value, unit), nil
@@ -665,7 +674,7 @@ func UnmarshalEnergy(data []byte) (Quantity[EnergyUnit], error) {
 	var unit EnergyUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "J":
 		unit = Energy.Joule
 		found = true
@@ -678,7 +687,7 @@ func UnmarshalEnergy(data []byte) (Quantity[EnergyUnit], error) {
 	}
 
 	if !found {
-		return Quantity[EnergyUnit]{}, fmt.Errorf("unknown energy unit: %s", jsonM.Unit)
+		return Quantity[EnergyUnit]{}, fmt.Errorf("unknown energy unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewEnergy(jsonM.Value, unit), nil
@@ -705,7 +714,7 @@ func UnmarshalLength(data []byte) (Quantity[LengthUnit], error) {
 	var unit LengthUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "m":
 		unit = Length.Meter
 		found = true
@@ -739,7 +748,7 @@ func UnmarshalLength(data []byte) (Quantity[LengthUnit], error) {
 	}
 
 	if !found {
-		return Quantity[LengthUnit]{}, fmt.Errorf("unknown length unit: %s", jsonM.Unit)
+		return Quantity[LengthUnit]{}, fmt.Errorf("unknown length unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewLength(jsonM.Value, unit), nil
@@ -766,7 +775,7 @@ func UnmarshalMass(data []byte) (Quantity[MassUnit], error) {
 	var unit MassUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "kg":
 		unit = Mass.Kilogram
 		found = true
@@ -797,7 +806,7 @@ func UnmarshalMass(data []byte) (Quantity[MassUnit], error) {
 	}
 
 	if !found {
-		return Quantity[MassUnit]{}, fmt.Errorf("unknown mass unit: %s", jsonM.Unit)
+		return Quantity[MassUnit]{}, fmt.Errorf("unknown mass unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewMass(jsonM.Value, unit), nil
@@ -824,7 +833,7 @@ func UnmarshalDuration(data []byte) (Quantity[DurationUnit], error) {
 	var unit DurationUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "s":
 		unit = Duration.Second
 		found = true
@@ -849,7 +858,7 @@ func UnmarshalDuration(data []byte) (Quantity[DurationUnit], error) {
 	}
 
 	if !found {
-		return Quantity[DurationUnit]{}, fmt.Errorf("unknown duration unit: %s", jsonM.Unit)
+		return Quantity[DurationUnit]{}, fmt.Errorf("unknown duration unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewDuration(jsonM.Value, unit), nil
@@ -876,7 +885,7 @@ func UnmarshalAngle(data []byte) (Quantity[AngleUnit], error) {
 	var unit AngleUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "rad":
 		unit = Angle.Radian
 		found = true
@@ -898,7 +907,7 @@ func UnmarshalAngle(data []byte) (Quantity[AngleUnit], error) {
 	}
 
 	if !found {
-		return Quantity[AngleUnit]{}, fmt.Errorf("unknown angle unit: %s", jsonM.Unit)
+		return Quantity[AngleUnit]{}, fmt.Errorf("unknown angle unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewAngle(jsonM.Value, unit), nil
@@ -925,7 +934,7 @@ func UnmarshalArea(data []byte) (Quantity[AreaUnit], error) {
 	var unit AreaUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "m²":
 		unit = Area.SquareMeter
 		found = true
@@ -959,7 +968,7 @@ func UnmarshalArea(data []byte) (Quantity[AreaUnit], error) {
 	}
 
 	if !found {
-		return Quantity[AreaUnit]{}, fmt.Errorf("unknown area unit: %s", jsonM.Unit)
+		return Quantity[AreaUnit]{}, fmt.Errorf("unknown area unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewArea(jsonM.Value, unit), nil
@@ -986,7 +995,7 @@ func UnmarshalVolume(data []byte) (Quantity[VolumeUnit], error) {
 	var unit VolumeUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "m³":
 		unit = Volume.CubicMeter
 		found = true
@@ -1032,7 +1041,7 @@ func UnmarshalVolume(data []byte) (Quantity[VolumeUnit], error) {
 	}
 
 	if !found {
-		return Quantity[VolumeUnit]{}, fmt.Errorf("unknown volume unit: %s", jsonM.Unit)
+		return Quantity[VolumeUnit]{}, fmt.Errorf("unknown volume unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewVolume(jsonM.Value, unit), nil
@@ -1059,7 +1068,7 @@ func UnmarshalAcceleration(data []byte) (Quantity[AccelerationUnit], error) {
 	var unit AccelerationUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "m/s²":
 		unit = Acceleration.MetersPerSecondSquared
 		found = true
@@ -1072,7 +1081,7 @@ func UnmarshalAcceleration(data []byte) (Quantity[AccelerationUnit], error) {
 	}
 
 	if !found {
-		return Quantity[AccelerationUnit]{}, fmt.Errorf("unknown acceleration unit: %s", jsonM.Unit)
+		return Quantity[AccelerationUnit]{}, fmt.Errorf("unknown acceleration unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewAcceleration(jsonM.Value, unit), nil
@@ -1099,7 +1108,7 @@ func UnmarshalConcentration(data []byte) (Quantity[ConcentrationUnit], error) {
 	var unit ConcentrationUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "g/L":
 		unit = Concentration.GramsPerLiter
 		found = true
@@ -1115,7 +1124,7 @@ func UnmarshalConcentration(data []byte) (Quantity[ConcentrationUnit], error) {
 	}
 
 	if !found {
-		return Quantity[ConcentrationUnit]{}, fmt.Errorf("unknown concentration unit: %s", jsonM.Unit)
+		return Quantity[ConcentrationUnit]{}, fmt.Errorf("unknown concentration unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewConcentration(jsonM.Value, unit), nil
@@ -1142,7 +1151,7 @@ func UnmarshalDispersion(data []byte) (Quantity[DispersionUnit], error) {
 	var unit DispersionUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "ppm":
 		unit = Dispersion.PartsPerMillion
 		found = true
@@ -1158,7 +1167,7 @@ func UnmarshalDispersion(data []byte) (Quantity[DispersionUnit], error) {
 	}
 
 	if !found {
-		return Quantity[DispersionUnit]{}, fmt.Errorf("unknown dispersion unit: %s", jsonM.Unit)
+		return Quantity[DispersionUnit]{}, fmt.Errorf("unknown dispersion unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewDispersion(jsonM.Value, unit), nil
@@ -1185,7 +1194,7 @@ func UnmarshalElectricCharge(data []byte) (Quantity[ElectricChargeUnit], error) 
 	var unit ElectricChargeUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "C":
 		unit = ElectricCharge.Coulomb
 		found = true
@@ -1204,7 +1213,7 @@ func UnmarshalElectricCharge(data []byte) (Quantity[ElectricChargeUnit], error) 
 	}
 
 	if !found {
-		return Quantity[ElectricChargeUnit]{}, fmt.Errorf("unknown electric charge unit: %s", jsonM.Unit)
+		return Quantity[ElectricChargeUnit]{}, fmt.Errorf("unknown electric charge unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewElectricCharge(jsonM.Value, unit), nil
@@ -1231,7 +1240,7 @@ func UnmarshalElectricCurrent(data []byte) (Quantity[ElectricCurrentUnit], error
 	var unit ElectricCurrentUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "A":
 		unit = ElectricCurrent.Ampere
 		found = true
@@ -1247,7 +1256,7 @@ func UnmarshalElectricCurrent(data []byte) (Quantity[ElectricCurrentUnit], error
 	}
 
 	if !found {
-		return Quantity[ElectricCurrentUnit]{}, fmt.Errorf("unknown electric current unit: %s", jsonM.Unit)
+		return Quantity[ElectricCurrentUnit]{}, fmt.Errorf("unknown electric current unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewElectricCurrent(jsonM.Value, unit), nil
@@ -1256,8 +1265,11 @@ func UnmarshalElectricCurrent(data []byte) (Quantity[ElectricCurrentUnit], error
 // MarshalSpeed serializes a Speed measurement to JSON
 func MarshalSpeed(m Quantity[SpeedUnit]) ([]byte, error) {
 	return json.Marshal(MeasurementJSON{
-		Value:     m.Value,
-		Unit:      m.Unit.Symbol(),
+		Value: m.Value,
+		Unit: UnitJSON{
+			Name:   m.Unit.Name(),
+			Symbol: m.Unit.Symbol(),
+		},
 		Dimension: m.Unit.Dimension(),
 	})
 }
@@ -1278,7 +1290,7 @@ func UnmarshalSpeed(data []byte) (Quantity[SpeedUnit], error) {
 	var unit SpeedUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "m/s":
 		unit = Speed.MetersPerSecond
 		found = true
@@ -1297,7 +1309,7 @@ func UnmarshalSpeed(data []byte) (Quantity[SpeedUnit], error) {
 	}
 
 	if !found {
-		return Quantity[SpeedUnit]{}, fmt.Errorf("unknown speed unit: %s", jsonM.Unit)
+		return Quantity[SpeedUnit]{}, fmt.Errorf("unknown speed unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewSpeed(jsonM.Value, unit), nil
@@ -1306,8 +1318,11 @@ func UnmarshalSpeed(data []byte) (Quantity[SpeedUnit], error) {
 // MarshalElectricPotentialDifference serializes an ElectricPotentialDifference measurement to JSON
 func MarshalElectricPotentialDifference(m Quantity[ElectricPotentialDifferenceUnit]) ([]byte, error) {
 	return json.Marshal(MeasurementJSON{
-		Value:     m.Value,
-		Unit:      m.Unit.Symbol(),
+		Value: m.Value,
+		Unit: UnitJSON{
+			Name:   m.Unit.Name(),
+			Symbol: m.Unit.Symbol(),
+		},
 		Dimension: m.Unit.Dimension(),
 	})
 }
@@ -1328,7 +1343,7 @@ func UnmarshalElectricPotentialDifference(data []byte) (Quantity[ElectricPotenti
 	var unit ElectricPotentialDifferenceUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "V":
 		unit = ElectricPotentialDifference.Volt
 		found = true
@@ -1347,7 +1362,7 @@ func UnmarshalElectricPotentialDifference(data []byte) (Quantity[ElectricPotenti
 	}
 
 	if !found {
-		return Quantity[ElectricPotentialDifferenceUnit]{}, fmt.Errorf("unknown electric potential difference unit: %s", jsonM.Unit)
+		return Quantity[ElectricPotentialDifferenceUnit]{}, fmt.Errorf("unknown electric potential difference unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewElectricPotentialDifference(jsonM.Value, unit), nil
@@ -1356,8 +1371,11 @@ func UnmarshalElectricPotentialDifference(data []byte) (Quantity[ElectricPotenti
 // MarshalInformation serializes an Information measurement to JSON
 func MarshalInformation(m Quantity[InformationUnit]) ([]byte, error) {
 	return json.Marshal(MeasurementJSON{
-		Value:     m.Value,
-		Unit:      m.Unit.Symbol(),
+		Value: m.Value,
+		Unit: UnitJSON{
+			Name:   m.Unit.Name(),
+			Symbol: m.Unit.Symbol(),
+		},
 		Dimension: m.Unit.Dimension(),
 	})
 }
@@ -1378,7 +1396,7 @@ func UnmarshalInformation(data []byte) (Quantity[InformationUnit], error) {
 	var unit InformationUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "bit":
 		unit = Information.Bit
 		found = true
@@ -1418,7 +1436,7 @@ func UnmarshalInformation(data []byte) (Quantity[InformationUnit], error) {
 	}
 
 	if !found {
-		return Quantity[InformationUnit]{}, fmt.Errorf("unknown information unit: %s", jsonM.Unit)
+		return Quantity[InformationUnit]{}, fmt.Errorf("unknown information unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewInformation(jsonM.Value, unit), nil
@@ -1427,8 +1445,11 @@ func UnmarshalInformation(data []byte) (Quantity[InformationUnit], error) {
 // MarshalFrequency serializes a Frequency measurement to JSON
 func MarshalFrequency(m Quantity[FrequencyUnit]) ([]byte, error) {
 	return json.Marshal(MeasurementJSON{
-		Value:     m.Value,
-		Unit:      m.Unit.Symbol(),
+		Value: m.Value,
+		Unit: UnitJSON{
+			Name:   m.Unit.Name(),
+			Symbol: m.Unit.Symbol(),
+		},
 		Dimension: m.Unit.Dimension(),
 	})
 }
@@ -1449,7 +1470,7 @@ func UnmarshalFrequency(data []byte) (Quantity[FrequencyUnit], error) {
 	var unit FrequencyUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "Hz":
 		unit = Frequency.Hertz
 		found = true
@@ -1471,7 +1492,7 @@ func UnmarshalFrequency(data []byte) (Quantity[FrequencyUnit], error) {
 	}
 
 	if !found {
-		return Quantity[FrequencyUnit]{}, fmt.Errorf("unknown frequency unit: %s", jsonM.Unit)
+		return Quantity[FrequencyUnit]{}, fmt.Errorf("unknown frequency unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewFrequency(jsonM.Value, unit), nil
@@ -1480,8 +1501,11 @@ func UnmarshalFrequency(data []byte) (Quantity[FrequencyUnit], error) {
 // MarshalIlluminance serializes an Illuminance measurement to JSON
 func MarshalIlluminance(m Quantity[IlluminanceUnit]) ([]byte, error) {
 	return json.Marshal(MeasurementJSON{
-		Value:     m.Value,
-		Unit:      m.Unit.Symbol(),
+		Value: m.Value,
+		Unit: UnitJSON{
+			Name:   m.Unit.Name(),
+			Symbol: m.Unit.Symbol(),
+		},
 		Dimension: m.Unit.Dimension(),
 	})
 }
@@ -1502,7 +1526,7 @@ func UnmarshalIlluminance(data []byte) (Quantity[IlluminanceUnit], error) {
 	var unit IlluminanceUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "lx":
 		unit = Illuminance.Lux
 		found = true
@@ -1518,7 +1542,7 @@ func UnmarshalIlluminance(data []byte) (Quantity[IlluminanceUnit], error) {
 	}
 
 	if !found {
-		return Quantity[IlluminanceUnit]{}, fmt.Errorf("unknown illuminance unit: %s", jsonM.Unit)
+		return Quantity[IlluminanceUnit]{}, fmt.Errorf("unknown illuminance unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewIlluminance(jsonM.Value, unit), nil
@@ -1527,8 +1551,11 @@ func UnmarshalIlluminance(data []byte) (Quantity[IlluminanceUnit], error) {
 // MarshalGeneral serializes a General measurement to JSON
 func MarshalGeneral(m Quantity[GeneralUnit]) ([]byte, error) {
 	return json.Marshal(MeasurementJSON{
-		Value:     m.Value,
-		Unit:      m.Unit.Symbol(),
+		Value: m.Value,
+		Unit: UnitJSON{
+			Name:   m.Unit.Name(),
+			Symbol: m.Unit.Symbol(),
+		},
 		Dimension: m.Unit.Dimension(),
 	})
 }
@@ -1536,8 +1563,11 @@ func MarshalGeneral(m Quantity[GeneralUnit]) ([]byte, error) {
 // MarshalFuelEfficiency serializes a FuelEfficiency measurement to JSON
 func MarshalFuelEfficiency(m Quantity[FuelEfficiencyUnit]) ([]byte, error) {
 	return json.Marshal(MeasurementJSON{
-		Value:     m.Value,
-		Unit:      m.Unit.Symbol(),
+		Value: m.Value,
+		Unit: UnitJSON{
+			Name:   m.Unit.Name(),
+			Symbol: m.Unit.Symbol(),
+		},
 		Dimension: m.Unit.Dimension(),
 	})
 }
@@ -1558,18 +1588,18 @@ func UnmarshalGeneral(data []byte) (Quantity[GeneralUnit], error) {
 	var unit GeneralUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "unit":
 		unit = General.Unit
 		found = true
 	default:
-		// For custom units, create a new general unit with the given symbol
-		unit = NewGeneralUnit(jsonM.Unit, jsonM.Unit)
+		// For custom units, create a new general unit with the given symbol and name
+		unit = NewGeneralUnit(jsonM.Unit.Symbol, jsonM.Unit.Name)
 		found = true
 	}
 
 	if !found {
-		return Quantity[GeneralUnit]{}, fmt.Errorf("unknown general unit: %s", jsonM.Unit)
+		return Quantity[GeneralUnit]{}, fmt.Errorf("unknown general unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewGeneral(jsonM.Value, unit), nil
@@ -1591,7 +1621,7 @@ func UnmarshalFuelEfficiency(data []byte) (Quantity[FuelEfficiencyUnit], error) 
 	var unit FuelEfficiencyUnit
 	found := false
 
-	switch jsonM.Unit {
+	switch jsonM.Unit.Symbol {
 	case "km/L":
 		unit = FuelEfficiency.KilometersPerLiter
 		found = true
@@ -1604,7 +1634,7 @@ func UnmarshalFuelEfficiency(data []byte) (Quantity[FuelEfficiencyUnit], error) 
 	}
 
 	if !found {
-		return Quantity[FuelEfficiencyUnit]{}, fmt.Errorf("unknown fuel efficiency unit: %s", jsonM.Unit)
+		return Quantity[FuelEfficiencyUnit]{}, fmt.Errorf("unknown fuel efficiency unit: %s", jsonM.Unit.Symbol)
 	}
 
 	return NewFuelEfficiency(jsonM.Value, unit), nil

@@ -108,8 +108,12 @@ func TestFrequencySerialization(t *testing.T) {
 	if jsonData["value"].(float64) != 1000.0 {
 		t.Errorf("Expected value to be 1000.0, got %f", jsonData["value"].(float64))
 	}
-	if jsonData["unit"].(string) != "Hz" {
-		t.Errorf("Expected unit to be Hz, got %s", jsonData["unit"].(string))
+	unitData := jsonData["unit"].(map[string]interface{})
+	if unitData["symbol"].(string) != "Hz" {
+		t.Errorf("Expected unit symbol to be Hz, got %s", unitData["symbol"].(string))
+	}
+	if unitData["name"].(string) != "Hertz" {
+		t.Errorf("Expected unit name to be Hertz, got %s", unitData["name"].(string))
 	}
 	if jsonData["dimension"].(string) != "frequency" {
 		t.Errorf("Expected dimension to be frequency, got %s", jsonData["dimension"].(string))

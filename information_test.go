@@ -102,8 +102,12 @@ func TestInformationSerialization(t *testing.T) {
 	if jsonData["value"].(float64) != 1024.0 {
 		t.Errorf("Expected value to be 1024.0, got %f", jsonData["value"].(float64))
 	}
-	if jsonData["unit"].(string) != "KiB" {
-		t.Errorf("Expected unit to be KiB, got %s", jsonData["unit"].(string))
+	unitData := jsonData["unit"].(map[string]interface{})
+	if unitData["symbol"].(string) != "KiB" {
+		t.Errorf("Expected unit symbol to be KiB, got %s", unitData["symbol"].(string))
+	}
+	if unitData["name"].(string) != "Kibibyte" {
+		t.Errorf("Expected unit name to be Kibibyte, got %s", unitData["name"].(string))
 	}
 	if jsonData["dimension"].(string) != "information" {
 		t.Errorf("Expected dimension to be information, got %s", jsonData["dimension"].(string))

@@ -120,8 +120,12 @@ func TestFuelEfficiencySerialization(t *testing.T) {
 	if jsonData["value"].(float64) != 10.0 {
 		t.Errorf("Expected value to be 10.0, got %f", jsonData["value"].(float64))
 	}
-	if jsonData["unit"].(string) != "km/L" {
-		t.Errorf("Expected unit to be km/L, got %s", jsonData["unit"].(string))
+	unitData := jsonData["unit"].(map[string]interface{})
+	if unitData["symbol"].(string) != "km/L" {
+		t.Errorf("Expected unit symbol to be km/L, got %s", unitData["symbol"].(string))
+	}
+	if unitData["name"].(string) != "Kilometers per Liter" {
+		t.Errorf("Expected unit name to be Kilometers per Liter, got %s", unitData["name"].(string))
 	}
 	if jsonData["dimension"].(string) != "fuel_efficiency" {
 		t.Errorf("Expected dimension to be fuel_efficiency, got %s", jsonData["dimension"].(string))

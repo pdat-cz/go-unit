@@ -25,8 +25,12 @@ func TestTemperatureSerialization(t *testing.T) {
 	if jsonM["value"] != float64(25.0) {
 		t.Errorf("Expected value 25.0, got %v", jsonM["value"])
 	}
-	if jsonM["unit"] != "°C" {
-		t.Errorf("Expected unit °C, got %v", jsonM["unit"])
+	unitData := jsonM["unit"].(map[string]interface{})
+	if unitData["symbol"] != "°C" {
+		t.Errorf("Expected unit symbol °C, got %v", unitData["symbol"])
+	}
+	if unitData["name"] != "Celsius" {
+		t.Errorf("Expected unit name Celsius, got %v", unitData["name"])
 	}
 	if jsonM["dimension"] != "temperature" {
 		t.Errorf("Expected dimension temperature, got %v", jsonM["dimension"])
@@ -64,8 +68,12 @@ func TestPressureSerialization(t *testing.T) {
 	if jsonM["value"] != float64(101.325) {
 		t.Errorf("Expected value 101.325, got %v", jsonM["value"])
 	}
-	if jsonM["unit"] != "kPa" {
-		t.Errorf("Expected unit kPa, got %v", jsonM["unit"])
+	unitData := jsonM["unit"].(map[string]interface{})
+	if unitData["symbol"] != "kPa" {
+		t.Errorf("Expected unit symbol kPa, got %v", unitData["symbol"])
+	}
+	if unitData["name"] != "Kilopascal" {
+		t.Errorf("Expected unit name Kilopascal, got %v", unitData["name"])
 	}
 	if jsonM["dimension"] != "pressure" {
 		t.Errorf("Expected dimension pressure, got %v", jsonM["dimension"])
@@ -151,19 +159,19 @@ func TestEnergySerialization(t *testing.T) {
 
 func TestInvalidSerialization(t *testing.T) {
 	// Test invalid JSON
-	_, err := UnmarshalTemperature([]byte(`{"value": "not a number", "unit": "°C", "dimension": "temperature"}`))
+	_, err := UnmarshalTemperature([]byte(`{"value": "not a number", "unit": {"name": "Celsius", "symbol": "°C"}, "dimension": "temperature"}`))
 	if err == nil {
 		t.Errorf("Expected error for invalid JSON, but got nil")
 	}
 
 	// Test invalid dimension
-	_, err = UnmarshalTemperature([]byte(`{"value": 25.0, "unit": "°C", "dimension": "pressure"}`))
+	_, err = UnmarshalTemperature([]byte(`{"value": 25.0, "unit": {"name": "Celsius", "symbol": "°C"}, "dimension": "pressure"}`))
 	if err == nil {
 		t.Errorf("Expected error for invalid dimension, but got nil")
 	}
 
 	// Test invalid unit
-	_, err = UnmarshalTemperature([]byte(`{"value": 25.0, "unit": "invalid", "dimension": "temperature"}`))
+	_, err = UnmarshalTemperature([]byte(`{"value": 25.0, "unit": {"name": "invalid", "symbol": "invalid"}, "dimension": "temperature"}`))
 	if err == nil {
 		t.Errorf("Expected error for invalid unit, but got nil")
 	}
@@ -171,7 +179,7 @@ func TestInvalidSerialization(t *testing.T) {
 
 func TestGenericUnmarshalMeasurement(t *testing.T) {
 	// Test temperature measurement
-	tempJSON := []byte(`{"value": 25.0, "unit": "°C", "dimension": "temperature"}`)
+	tempJSON := []byte(`{"value": 25.0, "unit": {"name": "Celsius", "symbol": "°C"}, "dimension": "temperature"}`)
 	anyTemp, err := UnmarshalMeasurement(tempJSON)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal temperature: %v", err)
@@ -195,7 +203,7 @@ func TestGenericUnmarshalMeasurement(t *testing.T) {
 	}
 
 	// Test length measurement
-	lengthJSON := []byte(`{"value": 10.0, "unit": "m", "dimension": "length"}`)
+	lengthJSON := []byte(`{"value": 10.0, "unit": {"name": "Meter", "symbol": "m"}, "dimension": "length"}`)
 	anyLength, err := UnmarshalMeasurement(lengthJSON)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal length: %v", err)
@@ -219,7 +227,7 @@ func TestGenericUnmarshalMeasurement(t *testing.T) {
 	}
 
 	// Test volume measurement
-	volumeJSON := []byte(`{"value": 5.0, "unit": "L", "dimension": "volume"}`)
+	volumeJSON := []byte(`{"value": 5.0, "unit": {"name": "Liter", "symbol": "L"}, "dimension": "volume"}`)
 	anyVolume, err := UnmarshalMeasurement(volumeJSON)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal volume: %v", err)
@@ -243,7 +251,7 @@ func TestGenericUnmarshalMeasurement(t *testing.T) {
 	}
 
 	// Test invalid dimension (should now fall back to general unit)
-	invalidJSON := []byte(`{"value": 10.0, "unit": "m", "dimension": "invalid_dimension"}`)
+	invalidJSON := []byte(`{"value": 10.0, "unit": {"name": "m", "symbol": "m"}, "dimension": "invalid_dimension"}`)
 	anyInvalid, err := UnmarshalMeasurement(invalidJSON)
 	if err != nil {
 		t.Errorf("Expected successful unmarshal with general fallback, got error: %v", err)

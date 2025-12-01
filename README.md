@@ -129,22 +129,36 @@ if err != nil {
 
 ### Serialization and Deserialization
 
-The package provides functions to serialize quantities to JSON and deserialize them back:
+Quantities implement `json.Marshaler` and `json.Unmarshaler` interfaces, so you can use standard Go JSON functions:
+
+```go
+temp := unit.NewTemperature(25, unit.Temperature.Celsius)
+
+// Serialize using json.Marshal
+data, err := json.Marshal(temp)
+// Output: {"value":25,"unit":{"name":"Celsius","symbol":"°C"},"dimension":"temperature"}
+
+// Deserialize using json.Unmarshal
+var temp2 unit.Quantity[unit.TemperatureUnit]
+err = json.Unmarshal(data, &temp2)
+```
+
+#### Explicit Marshal/Unmarshal Functions
+
+You can also use the explicit functions for each dimension:
 
 ```go
 // Serialize a temperature quantity to JSON
 tempJSON, err := unit.MarshalTemperature(temp)
 if err != nil {
-// Handle error
+    // Handle error
 }
-// tempJSON is now: {"value":25,"unit":"°C","dimension":"temperature"}
 
 // Deserialize a temperature quantity from JSON
 tempDeserialized, err := unit.UnmarshalTemperature(tempJSON)
 if err != nil {
-// Handle error
+    // Handle error
 }
-// tempDeserialized is now a Quantity[TemperatureUnit] with value 25°C
 ```
 
 #### Generic Deserialization
@@ -212,7 +226,24 @@ readingJSON, _ := json.Marshal(reading)
 
 ### Compact Serialization
 
-For systems that prefer snake_case keys (e.g., NATS subjects), use the compact format:
+For systems that prefer snake_case keys (e.g., NATS subjects), use the `Compact[T]` wrapper type:
+
+```go
+temp := unit.NewTemperature(25, unit.Temperature.Celsius)
+
+// Serialize using Compact wrapper with json.Marshal
+data, err := json.Marshal(unit.Compact[unit.TemperatureUnit]{temp})
+// Output: {"value":25,"unit":"temperature_celsius","symbol":"°C"}
+
+// Deserialize using json.Unmarshal
+var compact unit.Compact[unit.TemperatureUnit]
+err = json.Unmarshal(data, &compact)
+temp2 := compact.Quantity
+```
+
+#### Explicit Compact Functions
+
+You can also use the explicit compact functions:
 
 ```go
 // Compact format: {"value":25,"unit":"temperature_celsius"}
@@ -225,12 +256,21 @@ data, err := unit.MarshalCompactTemperatureWithSymbol(temp)
 temp, err := unit.UnmarshalCompactTemperature(data)
 ```
 
+#### Auto-Detection
+
 The generic `UnmarshalMeasurement` function auto-detects the format:
 
 ```go
 // Works with both standard and compact formats
 am, err := unit.UnmarshalMeasurement(jsonData)
 ```
+
+#### JSON Format Comparison
+
+| Type | JSON Output |
+|------|-------------|
+| `Quantity[T]` | `{"value":25,"unit":{"name":"Celsius","symbol":"°C"},"dimension":"temperature"}` |
+| `Compact[T]` | `{"value":25,"unit":"temperature_celsius","symbol":"°C"}` |
 
 ## Custom Units
 

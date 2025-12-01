@@ -16,21 +16,21 @@ func TestUnmarshalMeasurementWithGeneralFallback(t *testing.T) {
 	}{
 		{
 			name:               "Unknown dimension should fall back to general",
-			jsonInput:          `{"value": 42, "unit": "custom", "dimension": "unknown_dimension"}`,
+			jsonInput:          `{"value": 42, "unit": {"name": "custom", "symbol": "custom"}, "dimension": "unknown_dimension"}`,
 			expectedValue:      42,
 			expectedUnitSymbol: "custom",
 			expectedDimension:  "general",
 		},
 		{
 			name:               "Known dimension but unknown unit should fall back to general",
-			jsonInput:          `{"value": 25, "unit": "unknown_unit", "dimension": "temperature"}`,
+			jsonInput:          `{"value": 25, "unit": {"name": "unknown_unit", "symbol": "unknown_unit"}, "dimension": "temperature"}`,
 			expectedValue:      25,
 			expectedUnitSymbol: "unknown_unit",
 			expectedDimension:  "general",
 		},
 		{
 			name:               "Direct general dimension should work normally",
-			jsonInput:          `{"value": 100, "unit": "unit", "dimension": "general"}`,
+			jsonInput:          `{"value": 100, "unit": {"name": "Unit", "symbol": "unit"}, "dimension": "general"}`,
 			expectedValue:      100,
 			expectedUnitSymbol: "unit",
 			expectedDimension:  "general",
@@ -120,8 +120,8 @@ func TestMarshalAndUnmarshalGeneral(t *testing.T) {
 			if jsonM.Value != tc.expectedValue {
 				t.Errorf("Expected value to be %f, got %f", tc.expectedValue, jsonM.Value)
 			}
-			if jsonM.Unit != tc.expectedSymbol {
-				t.Errorf("Expected unit to be '%s', got '%s'", tc.expectedSymbol, jsonM.Unit)
+			if jsonM.Unit.Symbol != tc.expectedSymbol {
+				t.Errorf("Expected unit symbol to be '%s', got '%s'", tc.expectedSymbol, jsonM.Unit.Symbol)
 			}
 			if jsonM.Dimension != tc.expectedDimension {
 				t.Errorf("Expected dimension to be '%s', got '%s'", tc.expectedDimension, jsonM.Dimension)
