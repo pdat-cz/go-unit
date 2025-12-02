@@ -9,31 +9,65 @@ import (
 	"unicode"
 )
 
-// UnitJSON is used for JSON serialization of units
-type UnitJSON struct {
-	Name   string `json:"name" yaml:"name"`
-	Symbol string `json:"symbol" yaml:"symbol"`
+// SerializationFormat specifies which JSON format to use for serialization
+type SerializationFormat int
+
+const (
+	// FormatFull includes all unit details: {"value": 25.5, "unit": {"name": "Celsius", "symbol": "°C", "dimension": "temperature"}}
+	FormatFull SerializationFormat = iota
+	// FormatCompact includes unit key and symbol: {"value": 25.5, "unit": {"key": "temperature_celsius", "symbol": "°C"}}
+	FormatCompact
+	// FormatMinimal includes only unit key as string: {"value": 25.5, "unit": "temperature_celsius"}
+	FormatMinimal
+)
+
+// UnitFullJSON is used for full JSON serialization of units (all details nested)
+type UnitFullJSON struct {
+	Name      string `json:"name" yaml:"name"`
+	Symbol    string `json:"symbol" yaml:"symbol"`
+	Dimension string `json:"dimension" yaml:"dimension"`
 }
 
-// MeasurementJSON is used for JSON serialization of measurements
+// UnitCompactJSON is used for compact JSON serialization of units (key + symbol)
+type UnitCompactJSON struct {
+	Key    string `json:"key" yaml:"key"`       // "dimension_unitname" format, e.g., "temperature_celsius"
+	Symbol string `json:"symbol" yaml:"symbol"` // unit symbol, e.g., "°C"
+}
+
+// MeasurementJSON is used for full JSON serialization of measurements
 type MeasurementJSON struct {
-	Value     float64  `json:"value" yaml:"value"`
-	Unit      UnitJSON `json:"unit" yaml:"unit"`
-	Dimension string   `json:"dimension" yaml:"dimension"`
+	Value float64      `json:"value" yaml:"value"`
+	Unit  UnitFullJSON `json:"unit" yaml:"unit"`
 }
 
-// QuantityJSON is a non-generic struct used for JSON serialization
-type QuantityJSON struct {
-	Value     float64 `json:"value" yaml:"value"`
-	Unit      string  `json:"unit" yaml:"unit"`
-	Dimension string  `json:"dimension" yaml:"dimension"`
+// MeasurementCompactJSON is used for compact JSON serialization of measurements
+type MeasurementCompactJSON struct {
+	Value float64         `json:"value" yaml:"value"`
+	Unit  UnitCompactJSON `json:"unit" yaml:"unit"`
 }
 
-// CompactJSON is used for compact JSON serialization with snake_case unit keys
-type CompactJSON struct {
+// MeasurementMinimalJSON is used for minimal JSON serialization of measurements
+type MeasurementMinimalJSON struct {
+	Value float64 `json:"value" yaml:"value"`
+	Unit  string  `json:"unit" yaml:"unit"` // "dimension_unitname" format, e.g., "temperature_celsius"
+}
+
+// Legacy types for backward compatibility during deserialization
+type legacyMeasurementJSON struct {
+	Value     float64        `json:"value"`
+	Unit      legacyUnitJSON `json:"unit"`
+	Dimension string         `json:"dimension"`
+}
+
+type legacyUnitJSON struct {
+	Name   string `json:"name"`
+	Symbol string `json:"symbol"`
+}
+
+type legacyCompactJSON struct {
 	Value  float64 `json:"value"`
-	Unit   string  `json:"unit"`             // "dimension_unitname" format, e.g., "temperature_celsius"
-	Symbol string  `json:"symbol,omitempty"` // optional unit symbol, e.g., "°C"
+	Unit   string  `json:"unit"`
+	Symbol string  `json:"symbol,omitempty"`
 }
 
 // toSnakeCase converts a string to snake_case
@@ -79,6 +113,163 @@ func parseUnitKey(key string) (dimension, unitName string) {
 		return key, ""
 	}
 	return key[:idx], key[idx+1:]
+}
+
+// detectFormat determines which JSON format is being used
+// Returns: format type, dimension, error
+func detectFormat(data []byte) (SerializationFormat, string, error) {
+	// Try to parse as a generic map first to inspect structure
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return FormatFull, "", err
+	}
+
+	unitRaw, hasUnit := raw["unit"]
+	if !hasUnit {
+		return FormatFull, "", fmt.Errorf("missing 'unit' field")
+	}
+
+	// Check if unit is a string (minimal format) or object
+	var unitStr string
+	if err := json.Unmarshal(unitRaw, &unitStr); err == nil {
+		// It's a string - could be minimal format or legacy compact
+		// Check if there's a top-level symbol (legacy compact)
+		if _, hasSymbol := raw["symbol"]; hasSymbol {
+			// Legacy compact format: {"value": 25.5, "unit": "temperature_celsius", "symbol": "°C"}
+			dim, _ := parseUnitKey(unitStr)
+			return FormatMinimal, dim, nil // Treat as minimal for parsing purposes
+		}
+		// Minimal format: {"value": 25.5, "unit": "temperature_celsius"}
+		dim, _ := parseUnitKey(unitStr)
+		return FormatMinimal, dim, nil
+	}
+
+	// Unit is an object - check which type
+	var unitObj map[string]json.RawMessage
+	if err := json.Unmarshal(unitRaw, &unitObj); err != nil {
+		return FormatFull, "", err
+	}
+
+	// Check for "key" field (compact format)
+	if keyRaw, hasKey := unitObj["key"]; hasKey {
+		var keyStr string
+		if err := json.Unmarshal(keyRaw, &keyStr); err == nil {
+			dim, _ := parseUnitKey(keyStr)
+			return FormatCompact, dim, nil
+		}
+	}
+
+	// Check for "dimension" field (full format)
+	if dimRaw, hasDim := unitObj["dimension"]; hasDim {
+		var dimStr string
+		if err := json.Unmarshal(dimRaw, &dimStr); err == nil {
+			return FormatFull, dimStr, nil
+		}
+	}
+
+	// Check for legacy format with top-level dimension
+	if dimRaw, hasDim := raw["dimension"]; hasDim {
+		var dimStr string
+		if err := json.Unmarshal(dimRaw, &dimStr); err == nil {
+			return FormatFull, dimStr, nil // Legacy full format
+		}
+	}
+
+	return FormatFull, "", fmt.Errorf("could not determine format or dimension")
+}
+
+// unmarshalValue extracts the value from any format
+func unmarshalValue(data []byte) (float64, error) {
+	var obj struct {
+		Value float64 `json:"value"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return 0, err
+	}
+	return obj.Value, nil
+}
+
+// unmarshalUnitInfo extracts unit information from any format
+// Returns: symbol, name, key (for compact/minimal)
+func unmarshalUnitInfo(data []byte) (symbol, name, key string, err error) {
+	format, _, err := detectFormat(data)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	switch format {
+	case FormatFull:
+		// Try new full format first
+		var full MeasurementJSON
+		if err := json.Unmarshal(data, &full); err == nil && full.Unit.Symbol != "" {
+			return full.Unit.Symbol, full.Unit.Name, "", nil
+		}
+		// Try legacy format
+		var legacy legacyMeasurementJSON
+		if err := json.Unmarshal(data, &legacy); err == nil {
+			return legacy.Unit.Symbol, legacy.Unit.Name, "", nil
+		}
+	case FormatCompact:
+		var compact MeasurementCompactJSON
+		if err := json.Unmarshal(data, &compact); err == nil {
+			return compact.Unit.Symbol, "", compact.Unit.Key, nil
+		}
+	case FormatMinimal:
+		var minimal MeasurementMinimalJSON
+		if err := json.Unmarshal(data, &minimal); err == nil {
+			// Check for legacy compact with top-level symbol
+			var legacy legacyCompactJSON
+			if json.Unmarshal(data, &legacy) == nil && legacy.Symbol != "" {
+				return legacy.Symbol, "", minimal.Unit, nil
+			}
+			return "", "", minimal.Unit, nil
+		}
+	}
+
+	return "", "", "", fmt.Errorf("could not extract unit info")
+}
+
+// parsedMeasurement holds all extracted data from any JSON format
+type parsedMeasurement struct {
+	Value     float64
+	Symbol    string
+	Name      string
+	Key       string
+	Dimension string
+	Format    SerializationFormat
+}
+
+// parseMeasurement extracts all measurement data from any format
+func parseMeasurement(data []byte) (*parsedMeasurement, error) {
+	format, dimension, err := detectFormat(data)
+	if err != nil {
+		return nil, err
+	}
+
+	value, err := unmarshalValue(data)
+	if err != nil {
+		return nil, err
+	}
+
+	symbol, name, key, _ := unmarshalUnitInfo(data)
+
+	return &parsedMeasurement{
+		Value:     value,
+		Symbol:    symbol,
+		Name:      name,
+		Key:       key,
+		Dimension: dimension,
+		Format:    format,
+	}, nil
+}
+
+// matchUnitByKey tries to match a unit name from the key
+func (p *parsedMeasurement) matchUnitByKey(unitName string) bool {
+	if p.Key == "" {
+		return false
+	}
+	_, keyUnitName := parseUnitKey(p.Key)
+	return strings.EqualFold(keyUnitName, unitName)
 }
 
 // AnyMeasurement is a wrapper that can hold any type of measurement
@@ -279,166 +470,162 @@ func (am *AnyMeasurement) AsGeneral() (Quantity[GeneralUnit], bool) {
 
 // UnmarshalMeasurement deserializes a JSON representation to an AnyMeasurement
 // without requiring knowledge of the dimension in advance
+// Supports all three formats: full, compact, and minimal
 func UnmarshalMeasurement(data []byte) (*AnyMeasurement, error) {
-	// Auto-detect format: compact vs standard
-	if isCompactFormat(data) {
-		return unmarshalCompactMeasurement(data)
-	}
-
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	// Detect format and extract dimension
+	_, dimension, err := detectFormat(data)
+	if err != nil {
 		return nil, err
 	}
 
+	// Helper to create fallback
+	createFallback := func(origErr error) (*AnyMeasurement, error) {
+		value, _ := unmarshalValue(data)
+		symbol, name, key, _ := unmarshalUnitInfo(data)
+		if key != "" && symbol == "" {
+			_, unitName := parseUnitKey(key)
+			symbol = unitName
+		}
+		if name == "" {
+			name = symbol
+		}
+		return fallbackToGeneral(value, symbol, name, origErr)
+	}
+
 	// Based on the dimension, call the appropriate unmarshal function
-	switch jsonM.Dimension {
+	switch dimension {
 	case "temperature":
 		m, err := UnmarshalTemperature(data)
 		if err != nil {
-			// If there's a problem with the temperature dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "temperature"}, nil
 	case "pressure":
 		m, err := UnmarshalPressure(data)
 		if err != nil {
-			// If there's a problem with the pressure dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "pressure"}, nil
 	case "flowrate":
 		m, err := UnmarshalFlowRate(data)
 		if err != nil {
-			// If there's a problem with the flowrate dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "flowrate"}, nil
 	case "power":
 		m, err := UnmarshalPower(data)
 		if err != nil {
-			// If there's a problem with the power dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "power"}, nil
 	case "energy":
 		m, err := UnmarshalEnergy(data)
 		if err != nil {
-			// If there's a problem with the energy dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "energy"}, nil
 	case "length":
 		m, err := UnmarshalLength(data)
 		if err != nil {
-			// If there's a problem with the length dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "length"}, nil
 	case "mass":
 		m, err := UnmarshalMass(data)
 		if err != nil {
-			// If there's a problem with the mass dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "mass"}, nil
 	case "duration":
 		m, err := UnmarshalDuration(data)
 		if err != nil {
-			// If there's a problem with the duration dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "duration"}, nil
 	case "angle":
 		m, err := UnmarshalAngle(data)
 		if err != nil {
-			// If there's a problem with the angle dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "angle"}, nil
 	case "area":
 		m, err := UnmarshalArea(data)
 		if err != nil {
-			// If there's a problem with the area dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "area"}, nil
 	case "volume":
 		m, err := UnmarshalVolume(data)
 		if err != nil {
-			// If there's a problem with the volume dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "volume"}, nil
 	case "acceleration":
 		m, err := UnmarshalAcceleration(data)
 		if err != nil {
-			// If there's a problem with the acceleration dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "acceleration"}, nil
 	case "concentration":
 		m, err := UnmarshalConcentration(data)
 		if err != nil {
-			// If there's a problem with the concentration dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "concentration"}, nil
 	case "dispersion":
 		m, err := UnmarshalDispersion(data)
 		if err != nil {
-			// If there's a problem with the dispersion dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "dispersion"}, nil
 	case "electric_charge":
 		m, err := UnmarshalElectricCharge(data)
 		if err != nil {
-			// If there's a problem with the electric_charge dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "electric_charge"}, nil
 	case "electric_current":
 		m, err := UnmarshalElectricCurrent(data)
 		if err != nil {
-			// If there's a problem with the electric_current dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "electric_current"}, nil
 	case "electric_potential_difference":
 		m, err := UnmarshalElectricPotentialDifference(data)
 		if err != nil {
-			// If there's a problem with the electric_potential_difference dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "electric_potential_difference"}, nil
 	case "information":
 		m, err := UnmarshalInformation(data)
 		if err != nil {
-			// If there's a problem with the information dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "information"}, nil
 	case "frequency":
 		m, err := UnmarshalFrequency(data)
 		if err != nil {
-			// If there's a problem with the frequency dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "frequency"}, nil
 	case "illuminance":
 		m, err := UnmarshalIlluminance(data)
 		if err != nil {
-			// If there's a problem with the illuminance dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "illuminance"}, nil
 	case "fuel_efficiency":
 		m, err := UnmarshalFuelEfficiency(data)
 		if err != nil {
-			// If there's a problem with the fuel_efficiency dimension, use general unit
-			return fallbackToGeneral(data, jsonM, err)
+			return createFallback(err)
 		}
 		return &AnyMeasurement{value: m, dimension: "fuel_efficiency"}, nil
+	case "speed":
+		m, err := UnmarshalSpeed(data)
+		if err != nil {
+			return createFallback(err)
+		}
+		return &AnyMeasurement{value: m, dimension: "speed"}, nil
 	case "general":
 		m, err := UnmarshalGeneral(data)
 		if err != nil {
@@ -447,44 +634,61 @@ func UnmarshalMeasurement(data []byte) (*AnyMeasurement, error) {
 		return &AnyMeasurement{value: m, dimension: "general"}, nil
 	default:
 		// For unknown dimensions, use general unit
-		return fallbackToGeneral(data, jsonM, fmt.Errorf("unknown dimension: %s", jsonM.Dimension))
+		return createFallback(fmt.Errorf("unknown dimension: %s", dimension))
 	}
 }
 
 // fallbackToGeneral creates a general measurement from the given JSON data
-func fallbackToGeneral(data []byte, jsonM MeasurementJSON, originalErr error) (*AnyMeasurement, error) {
-	// Create a new JSON object with the general dimension
-	generalJSON := MeasurementJSON{
-		Value:     jsonM.Value,
-		Unit:      jsonM.Unit,
-		Dimension: "general",
-	}
-
-	// Marshal the general JSON object
-	generalData, err := json.Marshal(generalJSON)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create general measurement: %w", err)
-	}
-
-	// Unmarshal as a general measurement
-	m, err := UnmarshalGeneral(generalData)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal as general measurement: %w (original error: %v)", err, originalErr)
-	}
-
+func fallbackToGeneral(value float64, symbol, name string, originalErr error) (*AnyMeasurement, error) {
+	// Create a general unit with the given symbol and name
+	unit := NewGeneralUnit(symbol, name)
+	m := NewGeneral(value, unit)
 	return &AnyMeasurement{value: m, dimension: "general"}, nil
 }
 
-// marshalGeneric is a helper function to serialize any measurement to JSON
+// marshalGeneric is a helper function to serialize any measurement to JSON (full format)
 func marshalGeneric[T Category](m Quantity[T]) ([]byte, error) {
 	return json.Marshal(MeasurementJSON{
 		Value: m.Value,
-		Unit: UnitJSON{
-			Name:   m.Unit.Name(),
+		Unit: UnitFullJSON{
+			Name:      m.Unit.Name(),
+			Symbol:    m.Unit.Symbol(),
+			Dimension: m.Unit.Dimension(),
+		},
+	})
+}
+
+// marshalGenericCompact is a helper function to serialize any measurement to compact JSON
+func marshalGenericCompact[T Category](m Quantity[T]) ([]byte, error) {
+	return json.Marshal(MeasurementCompactJSON{
+		Value: m.Value,
+		Unit: UnitCompactJSON{
+			Key:    unitKey(m.Unit.Dimension(), m.Unit.Name()),
 			Symbol: m.Unit.Symbol(),
 		},
-		Dimension: m.Unit.Dimension(),
 	})
+}
+
+// marshalGenericMinimal is a helper function to serialize any measurement to minimal JSON
+func marshalGenericMinimal[T Category](m Quantity[T]) ([]byte, error) {
+	return json.Marshal(MeasurementMinimalJSON{
+		Value: m.Value,
+		Unit:  unitKey(m.Unit.Dimension(), m.Unit.Name()),
+	})
+}
+
+// MarshalWithFormat serializes any measurement to JSON with the specified format
+func MarshalWithFormat[T Category](m Quantity[T], format SerializationFormat) ([]byte, error) {
+	switch format {
+	case FormatFull:
+		return marshalGeneric(m)
+	case FormatCompact:
+		return marshalGenericCompact(m)
+	case FormatMinimal:
+		return marshalGenericMinimal(m)
+	default:
+		return marshalGeneric(m)
+	}
 }
 
 // MarshalTemperature serializes a Temperature measurement to JSON
@@ -493,38 +697,30 @@ func MarshalTemperature(m Quantity[TemperatureUnit]) ([]byte, error) {
 }
 
 // UnmarshalTemperature deserializes a JSON representation to a Temperature measurement
+// Supports all three formats: full, compact, and minimal
 func UnmarshalTemperature(data []byte) (Quantity[TemperatureUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[TemperatureUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "temperature" {
-		return Quantity[TemperatureUnit]{}, fmt.Errorf("expected dimension 'temperature', got '%s'", jsonM.Dimension)
+	if p.Dimension != "temperature" {
+		return Quantity[TemperatureUnit]{}, fmt.Errorf("expected dimension 'temperature', got '%s'", p.Dimension)
 	}
 
-	// Find the matching temperature unit
 	var unit TemperatureUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "°C", "C":
+	switch {
+	case p.Symbol == "°C" || p.Symbol == "C" || p.matchUnitByKey("celsius"):
 		unit = Temperature.Celsius
-		found = true
-	case "°F", "F":
+	case p.Symbol == "°F" || p.Symbol == "F" || p.matchUnitByKey("fahrenheit"):
 		unit = Temperature.Fahrenheit
-		found = true
-	case "K":
+	case p.Symbol == "K" || p.matchUnitByKey("kelvin"):
 		unit = Temperature.Kelvin
-		found = true
+	default:
+		return Quantity[TemperatureUnit]{}, fmt.Errorf("unknown temperature unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[TemperatureUnit]{}, fmt.Errorf("unknown temperature unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewTemperature(jsonM.Value, unit), nil
+	return NewTemperature(p.Value, unit), nil
 }
 
 // MarshalPressure serializes a Pressure measurement to JSON
@@ -534,43 +730,32 @@ func MarshalPressure(m Quantity[PressureUnit]) ([]byte, error) {
 
 // UnmarshalPressure deserializes a JSON representation to a Pressure measurement
 func UnmarshalPressure(data []byte) (Quantity[PressureUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[PressureUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "pressure" {
-		return Quantity[PressureUnit]{}, fmt.Errorf("expected dimension 'pressure', got '%s'", jsonM.Dimension)
+	if p.Dimension != "pressure" {
+		return Quantity[PressureUnit]{}, fmt.Errorf("expected dimension 'pressure', got '%s'", p.Dimension)
 	}
 
-	// Find the matching pressure unit
 	var unit PressureUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "Pa":
+	switch {
+	case p.Symbol == "Pa" || p.matchUnitByKey("pascal"):
 		unit = Pressure.Pascal
-		found = true
-	case "kPa":
+	case p.Symbol == "kPa" || p.matchUnitByKey("kilopascal"):
 		unit = Pressure.Kilopascal
-		found = true
-	case "bar":
+	case p.Symbol == "bar" || p.matchUnitByKey("bar"):
 		unit = Pressure.Bar
-		found = true
-	case "psi":
+	case p.Symbol == "psi" || p.matchUnitByKey("psi"):
 		unit = Pressure.PSI
-		found = true
-	case "inH₂O", "inH2O":
+	case p.Symbol == "inH₂O" || p.Symbol == "inH2O" || p.matchUnitByKey("inch_h2o"):
 		unit = Pressure.InchH2O
-		found = true
+	default:
+		return Quantity[PressureUnit]{}, fmt.Errorf("unknown pressure unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[PressureUnit]{}, fmt.Errorf("unknown pressure unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewPressure(jsonM.Value, unit), nil
+	return NewPressure(p.Value, unit), nil
 }
 
 // MarshalFlowRate serializes a FlowRate measurement to JSON
@@ -580,37 +765,28 @@ func MarshalFlowRate(m Quantity[FlowRateUnit]) ([]byte, error) {
 
 // UnmarshalFlowRate deserializes a JSON representation to a FlowRate measurement
 func UnmarshalFlowRate(data []byte) (Quantity[FlowRateUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[FlowRateUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "flowrate" {
-		return Quantity[FlowRateUnit]{}, fmt.Errorf("expected dimension 'flowrate', got '%s'", jsonM.Dimension)
+	if p.Dimension != "flowrate" {
+		return Quantity[FlowRateUnit]{}, fmt.Errorf("expected dimension 'flowrate', got '%s'", p.Dimension)
 	}
 
-	// Find the matching flowrate unit
 	var unit FlowRateUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "m³/h":
+	switch {
+	case p.Symbol == "m³/h" || p.matchUnitByKey("cubic_meters_per_hour"):
 		unit = FlowRate.CubicMetersPerHour
-		found = true
-	case "L/s":
+	case p.Symbol == "L/s" || p.matchUnitByKey("liters_per_second"):
 		unit = FlowRate.LitersPerSecond
-		found = true
-	case "CFM":
+	case p.Symbol == "CFM" || p.matchUnitByKey("cfm"):
 		unit = FlowRate.CFM
-		found = true
+	default:
+		return Quantity[FlowRateUnit]{}, fmt.Errorf("unknown flowrate unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[FlowRateUnit]{}, fmt.Errorf("unknown flowrate unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewFlowRate(jsonM.Value, unit), nil
+	return NewFlowRate(p.Value, unit), nil
 }
 
 // MarshalPower serializes a Power measurement to JSON
@@ -620,37 +796,28 @@ func MarshalPower(m Quantity[PowerUnit]) ([]byte, error) {
 
 // UnmarshalPower deserializes a JSON representation to a Power measurement
 func UnmarshalPower(data []byte) (Quantity[PowerUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[PowerUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "power" {
-		return Quantity[PowerUnit]{}, fmt.Errorf("expected dimension 'power', got '%s'", jsonM.Dimension)
+	if p.Dimension != "power" {
+		return Quantity[PowerUnit]{}, fmt.Errorf("expected dimension 'power', got '%s'", p.Dimension)
 	}
 
-	// Find the matching power unit
 	var unit PowerUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "W":
+	switch {
+	case p.Symbol == "W" || p.matchUnitByKey("watt"):
 		unit = Power.Watt
-		found = true
-	case "kW":
+	case p.Symbol == "kW" || p.matchUnitByKey("kilowatt"):
 		unit = Power.Kilowatt
-		found = true
-	case "BTU/h":
+	case p.Symbol == "BTU/h" || p.matchUnitByKey("btu_per_hour"):
 		unit = Power.BTUPerHour
-		found = true
+	default:
+		return Quantity[PowerUnit]{}, fmt.Errorf("unknown power unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[PowerUnit]{}, fmt.Errorf("unknown power unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewPower(jsonM.Value, unit), nil
+	return NewPower(p.Value, unit), nil
 }
 
 // MarshalEnergy serializes an Energy measurement to JSON
@@ -660,37 +827,28 @@ func MarshalEnergy(m Quantity[EnergyUnit]) ([]byte, error) {
 
 // UnmarshalEnergy deserializes a JSON representation to an Energy measurement
 func UnmarshalEnergy(data []byte) (Quantity[EnergyUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[EnergyUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "energy" {
-		return Quantity[EnergyUnit]{}, fmt.Errorf("expected dimension 'energy', got '%s'", jsonM.Dimension)
+	if p.Dimension != "energy" {
+		return Quantity[EnergyUnit]{}, fmt.Errorf("expected dimension 'energy', got '%s'", p.Dimension)
 	}
 
-	// Find the matching energy unit
 	var unit EnergyUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "J":
+	switch {
+	case p.Symbol == "J" || p.matchUnitByKey("joule"):
 		unit = Energy.Joule
-		found = true
-	case "kWh":
+	case p.Symbol == "kWh" || p.matchUnitByKey("kilowatt_hour"):
 		unit = Energy.KilowattHour
-		found = true
-	case "BTU":
+	case p.Symbol == "BTU" || p.matchUnitByKey("btu"):
 		unit = Energy.BTU
-		found = true
+	default:
+		return Quantity[EnergyUnit]{}, fmt.Errorf("unknown energy unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[EnergyUnit]{}, fmt.Errorf("unknown energy unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewEnergy(jsonM.Value, unit), nil
+	return NewEnergy(p.Value, unit), nil
 }
 
 // MarshalLength serializes a Length measurement to JSON
@@ -700,58 +858,42 @@ func MarshalLength(m Quantity[LengthUnit]) ([]byte, error) {
 
 // UnmarshalLength deserializes a JSON representation to a Length measurement
 func UnmarshalLength(data []byte) (Quantity[LengthUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[LengthUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "length" {
-		return Quantity[LengthUnit]{}, fmt.Errorf("expected dimension 'length', got '%s'", jsonM.Dimension)
+	if p.Dimension != "length" {
+		return Quantity[LengthUnit]{}, fmt.Errorf("expected dimension 'length', got '%s'", p.Dimension)
 	}
 
-	// Find the matching length unit
 	var unit LengthUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "m":
+	switch {
+	case p.Symbol == "m" || p.matchUnitByKey("meter"):
 		unit = Length.Meter
-		found = true
-	case "km":
+	case p.Symbol == "km" || p.matchUnitByKey("kilometer"):
 		unit = Length.Kilometer
-		found = true
-	case "cm":
+	case p.Symbol == "cm" || p.matchUnitByKey("centimeter"):
 		unit = Length.Centimeter
-		found = true
-	case "mm":
+	case p.Symbol == "mm" || p.matchUnitByKey("millimeter"):
 		unit = Length.Millimeter
-		found = true
-	case "µm":
+	case p.Symbol == "µm" || p.matchUnitByKey("micrometer"):
 		unit = Length.Micrometer
-		found = true
-	case "nm":
+	case p.Symbol == "nm" || p.matchUnitByKey("nanometer"):
 		unit = Length.Nanometer
-		found = true
-	case "in":
+	case p.Symbol == "in" || p.matchUnitByKey("inch"):
 		unit = Length.Inch
-		found = true
-	case "ft":
+	case p.Symbol == "ft" || p.matchUnitByKey("foot"):
 		unit = Length.Foot
-		found = true
-	case "yd":
+	case p.Symbol == "yd" || p.matchUnitByKey("yard"):
 		unit = Length.Yard
-		found = true
-	case "mi":
+	case p.Symbol == "mi" || p.matchUnitByKey("mile"):
 		unit = Length.Mile
-		found = true
+	default:
+		return Quantity[LengthUnit]{}, fmt.Errorf("unknown length unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[LengthUnit]{}, fmt.Errorf("unknown length unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewLength(jsonM.Value, unit), nil
+	return NewLength(p.Value, unit), nil
 }
 
 // MarshalMass serializes a Mass measurement to JSON
@@ -761,55 +903,40 @@ func MarshalMass(m Quantity[MassUnit]) ([]byte, error) {
 
 // UnmarshalMass deserializes a JSON representation to a Mass measurement
 func UnmarshalMass(data []byte) (Quantity[MassUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[MassUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "mass" {
-		return Quantity[MassUnit]{}, fmt.Errorf("expected dimension 'mass', got '%s'", jsonM.Dimension)
+	if p.Dimension != "mass" {
+		return Quantity[MassUnit]{}, fmt.Errorf("expected dimension 'mass', got '%s'", p.Dimension)
 	}
 
-	// Find the matching mass unit
 	var unit MassUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "kg":
+	switch {
+	case p.Symbol == "kg" || p.matchUnitByKey("kilogram"):
 		unit = Mass.Kilogram
-		found = true
-	case "g":
+	case p.Symbol == "g" || p.matchUnitByKey("gram"):
 		unit = Mass.Gram
-		found = true
-	case "mg":
+	case p.Symbol == "mg" || p.matchUnitByKey("milligram"):
 		unit = Mass.Milligram
-		found = true
-	case "µg":
+	case p.Symbol == "µg" || p.matchUnitByKey("microgram"):
 		unit = Mass.Microgram
-		found = true
-	case "lb":
+	case p.Symbol == "lb" || p.matchUnitByKey("pound"):
 		unit = Mass.Pound
-		found = true
-	case "oz":
+	case p.Symbol == "oz" || p.matchUnitByKey("ounce"):
 		unit = Mass.Ounce
-		found = true
-	case "st":
+	case p.Symbol == "st" || p.matchUnitByKey("stone"):
 		unit = Mass.Stone
-		found = true
-	case "t":
+	case p.Symbol == "t" || p.matchUnitByKey("metric_ton"):
 		unit = Mass.MetricTon
-		found = true
-	case "ton":
+	case p.Symbol == "ton" || p.matchUnitByKey("ton"):
 		unit = Mass.Ton
-		found = true
+	default:
+		return Quantity[MassUnit]{}, fmt.Errorf("unknown mass unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[MassUnit]{}, fmt.Errorf("unknown mass unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewMass(jsonM.Value, unit), nil
+	return NewMass(p.Value, unit), nil
 }
 
 // MarshalDuration serializes a Duration measurement to JSON
@@ -819,49 +946,36 @@ func MarshalDuration(m Quantity[DurationUnit]) ([]byte, error) {
 
 // UnmarshalDuration deserializes a JSON representation to a Duration measurement
 func UnmarshalDuration(data []byte) (Quantity[DurationUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[DurationUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "duration" {
-		return Quantity[DurationUnit]{}, fmt.Errorf("expected dimension 'duration', got '%s'", jsonM.Dimension)
+	if p.Dimension != "duration" {
+		return Quantity[DurationUnit]{}, fmt.Errorf("expected dimension 'duration', got '%s'", p.Dimension)
 	}
 
-	// Find the matching duration unit
 	var unit DurationUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "s":
+	switch {
+	case p.Symbol == "s" || p.matchUnitByKey("second"):
 		unit = Duration.Second
-		found = true
-	case "min":
+	case p.Symbol == "min" || p.matchUnitByKey("minute"):
 		unit = Duration.Minute
-		found = true
-	case "h":
+	case p.Symbol == "h" || p.matchUnitByKey("hour"):
 		unit = Duration.Hour
-		found = true
-	case "d":
+	case p.Symbol == "d" || p.matchUnitByKey("day"):
 		unit = Duration.Day
-		found = true
-	case "ms":
+	case p.Symbol == "ms" || p.matchUnitByKey("millisecond"):
 		unit = Duration.Millisecond
-		found = true
-	case "µs":
+	case p.Symbol == "µs" || p.matchUnitByKey("microsecond"):
 		unit = Duration.Microsecond
-		found = true
-	case "ns":
+	case p.Symbol == "ns" || p.matchUnitByKey("nanosecond"):
 		unit = Duration.Nanosecond
-		found = true
+	default:
+		return Quantity[DurationUnit]{}, fmt.Errorf("unknown duration unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[DurationUnit]{}, fmt.Errorf("unknown duration unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewDuration(jsonM.Value, unit), nil
+	return NewDuration(p.Value, unit), nil
 }
 
 // MarshalAngle serializes an Angle measurement to JSON
@@ -871,46 +985,34 @@ func MarshalAngle(m Quantity[AngleUnit]) ([]byte, error) {
 
 // UnmarshalAngle deserializes a JSON representation to an Angle measurement
 func UnmarshalAngle(data []byte) (Quantity[AngleUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[AngleUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "angle" {
-		return Quantity[AngleUnit]{}, fmt.Errorf("expected dimension 'angle', got '%s'", jsonM.Dimension)
+	if p.Dimension != "angle" {
+		return Quantity[AngleUnit]{}, fmt.Errorf("expected dimension 'angle', got '%s'", p.Dimension)
 	}
 
-	// Find the matching angle unit
 	var unit AngleUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "rad":
+	switch {
+	case p.Symbol == "rad" || p.matchUnitByKey("radian"):
 		unit = Angle.Radian
-		found = true
-	case "°":
+	case p.Symbol == "°" || p.matchUnitByKey("degree"):
 		unit = Angle.Degree
-		found = true
-	case "′":
+	case p.Symbol == "′" || p.matchUnitByKey("arcminute"):
 		unit = Angle.Arcminute
-		found = true
-	case "″":
+	case p.Symbol == "″" || p.matchUnitByKey("arcsecond"):
 		unit = Angle.Arcsecond
-		found = true
-	case "rev":
+	case p.Symbol == "rev" || p.matchUnitByKey("revolution"):
 		unit = Angle.Revolution
-		found = true
-	case "grad":
+	case p.Symbol == "grad" || p.matchUnitByKey("gradian"):
 		unit = Angle.Gradian
-		found = true
+	default:
+		return Quantity[AngleUnit]{}, fmt.Errorf("unknown angle unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[AngleUnit]{}, fmt.Errorf("unknown angle unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewAngle(jsonM.Value, unit), nil
+	return NewAngle(p.Value, unit), nil
 }
 
 // MarshalArea serializes an Area measurement to JSON
@@ -920,58 +1022,42 @@ func MarshalArea(m Quantity[AreaUnit]) ([]byte, error) {
 
 // UnmarshalArea deserializes a JSON representation to an Area measurement
 func UnmarshalArea(data []byte) (Quantity[AreaUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[AreaUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "area" {
-		return Quantity[AreaUnit]{}, fmt.Errorf("expected dimension 'area', got '%s'", jsonM.Dimension)
+	if p.Dimension != "area" {
+		return Quantity[AreaUnit]{}, fmt.Errorf("expected dimension 'area', got '%s'", p.Dimension)
 	}
 
-	// Find the matching area unit
 	var unit AreaUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "m²":
+	switch {
+	case p.Symbol == "m²" || p.matchUnitByKey("square_meter"):
 		unit = Area.SquareMeter
-		found = true
-	case "km²":
+	case p.Symbol == "km²" || p.matchUnitByKey("square_kilometer"):
 		unit = Area.SquareKilometer
-		found = true
-	case "cm²":
+	case p.Symbol == "cm²" || p.matchUnitByKey("square_centimeter"):
 		unit = Area.SquareCentimeter
-		found = true
-	case "mm²":
+	case p.Symbol == "mm²" || p.matchUnitByKey("square_millimeter"):
 		unit = Area.SquareMillimeter
-		found = true
-	case "in²":
+	case p.Symbol == "in²" || p.matchUnitByKey("square_inch"):
 		unit = Area.SquareInch
-		found = true
-	case "ft²":
+	case p.Symbol == "ft²" || p.matchUnitByKey("square_foot"):
 		unit = Area.SquareFoot
-		found = true
-	case "yd²":
+	case p.Symbol == "yd²" || p.matchUnitByKey("square_yard"):
 		unit = Area.SquareYard
-		found = true
-	case "mi²":
+	case p.Symbol == "mi²" || p.matchUnitByKey("square_mile"):
 		unit = Area.SquareMile
-		found = true
-	case "ac":
+	case p.Symbol == "ac" || p.matchUnitByKey("acre"):
 		unit = Area.Acre
-		found = true
-	case "ha":
+	case p.Symbol == "ha" || p.matchUnitByKey("hectare"):
 		unit = Area.Hectare
-		found = true
+	default:
+		return Quantity[AreaUnit]{}, fmt.Errorf("unknown area unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[AreaUnit]{}, fmt.Errorf("unknown area unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewArea(jsonM.Value, unit), nil
+	return NewArea(p.Value, unit), nil
 }
 
 // MarshalVolume serializes a Volume measurement to JSON
@@ -981,70 +1067,50 @@ func MarshalVolume(m Quantity[VolumeUnit]) ([]byte, error) {
 
 // UnmarshalVolume deserializes a JSON representation to a Volume measurement
 func UnmarshalVolume(data []byte) (Quantity[VolumeUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[VolumeUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "volume" {
-		return Quantity[VolumeUnit]{}, fmt.Errorf("expected dimension 'volume', got '%s'", jsonM.Dimension)
+	if p.Dimension != "volume" {
+		return Quantity[VolumeUnit]{}, fmt.Errorf("expected dimension 'volume', got '%s'", p.Dimension)
 	}
 
-	// Find the matching volume unit
 	var unit VolumeUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "m³":
+	switch {
+	case p.Symbol == "m³" || p.matchUnitByKey("cubic_meter"):
 		unit = Volume.CubicMeter
-		found = true
-	case "km³":
+	case p.Symbol == "km³" || p.matchUnitByKey("cubic_kilometer"):
 		unit = Volume.CubicKilometer
-		found = true
-	case "cm³":
+	case p.Symbol == "cm³" || p.matchUnitByKey("cubic_centimeter"):
 		unit = Volume.CubicCentimeter
-		found = true
-	case "mm³":
+	case p.Symbol == "mm³" || p.matchUnitByKey("cubic_millimeter"):
 		unit = Volume.CubicMillimeter
-		found = true
-	case "L":
+	case p.Symbol == "L" || p.matchUnitByKey("liter"):
 		unit = Volume.Liter
-		found = true
-	case "mL":
+	case p.Symbol == "mL" || p.matchUnitByKey("milliliter"):
 		unit = Volume.Milliliter
-		found = true
-	case "in³":
+	case p.Symbol == "in³" || p.matchUnitByKey("cubic_inch"):
 		unit = Volume.CubicInch
-		found = true
-	case "ft³":
+	case p.Symbol == "ft³" || p.matchUnitByKey("cubic_foot"):
 		unit = Volume.CubicFoot
-		found = true
-	case "yd³":
+	case p.Symbol == "yd³" || p.matchUnitByKey("cubic_yard"):
 		unit = Volume.CubicYard
-		found = true
-	case "gal":
+	case p.Symbol == "gal" || p.matchUnitByKey("gallon"):
 		unit = Volume.Gallon
-		found = true
-	case "qt":
+	case p.Symbol == "qt" || p.matchUnitByKey("quart"):
 		unit = Volume.Quart
-		found = true
-	case "pt":
+	case p.Symbol == "pt" || p.matchUnitByKey("pint"):
 		unit = Volume.Pint
-		found = true
-	case "cup":
+	case p.Symbol == "cup" || p.matchUnitByKey("cup"):
 		unit = Volume.Cup
-		found = true
-	case "fl oz":
+	case p.Symbol == "fl oz" || p.matchUnitByKey("fluid_ounce"):
 		unit = Volume.FluidOunce
-		found = true
+	default:
+		return Quantity[VolumeUnit]{}, fmt.Errorf("unknown volume unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[VolumeUnit]{}, fmt.Errorf("unknown volume unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewVolume(jsonM.Value, unit), nil
+	return NewVolume(p.Value, unit), nil
 }
 
 // MarshalAcceleration serializes an Acceleration measurement to JSON
@@ -1054,37 +1120,28 @@ func MarshalAcceleration(m Quantity[AccelerationUnit]) ([]byte, error) {
 
 // UnmarshalAcceleration deserializes a JSON representation to an Acceleration measurement
 func UnmarshalAcceleration(data []byte) (Quantity[AccelerationUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[AccelerationUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "acceleration" {
-		return Quantity[AccelerationUnit]{}, fmt.Errorf("expected dimension 'acceleration', got '%s'", jsonM.Dimension)
+	if p.Dimension != "acceleration" {
+		return Quantity[AccelerationUnit]{}, fmt.Errorf("expected dimension 'acceleration', got '%s'", p.Dimension)
 	}
 
-	// Find the matching acceleration unit
 	var unit AccelerationUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "m/s²":
+	switch {
+	case p.Symbol == "m/s²" || p.matchUnitByKey("meters_per_second_squared"):
 		unit = Acceleration.MetersPerSecondSquared
-		found = true
-	case "g":
+	case p.Symbol == "g" || p.matchUnitByKey("g"):
 		unit = Acceleration.G
-		found = true
-	case "ft/s²":
+	case p.Symbol == "ft/s²" || p.matchUnitByKey("feet_per_second_squared"):
 		unit = Acceleration.FeetPerSecondSquared
-		found = true
+	default:
+		return Quantity[AccelerationUnit]{}, fmt.Errorf("unknown acceleration unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[AccelerationUnit]{}, fmt.Errorf("unknown acceleration unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewAcceleration(jsonM.Value, unit), nil
+	return NewAcceleration(p.Value, unit), nil
 }
 
 // MarshalConcentration serializes a Concentration measurement to JSON
@@ -1094,40 +1151,30 @@ func MarshalConcentration(m Quantity[ConcentrationUnit]) ([]byte, error) {
 
 // UnmarshalConcentration deserializes a JSON representation to a Concentration measurement
 func UnmarshalConcentration(data []byte) (Quantity[ConcentrationUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[ConcentrationUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "concentration" {
-		return Quantity[ConcentrationUnit]{}, fmt.Errorf("expected dimension 'concentration', got '%s'", jsonM.Dimension)
+	if p.Dimension != "concentration" {
+		return Quantity[ConcentrationUnit]{}, fmt.Errorf("expected dimension 'concentration', got '%s'", p.Dimension)
 	}
 
-	// Find the matching concentration unit
 	var unit ConcentrationUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "g/L":
+	switch {
+	case p.Symbol == "g/L" || p.matchUnitByKey("grams_per_liter"):
 		unit = Concentration.GramsPerLiter
-		found = true
-	case "mg/L":
+	case p.Symbol == "mg/L" || p.matchUnitByKey("milligrams_per_liter"):
 		unit = Concentration.MilligramsPerLiter
-		found = true
-	case "ppm":
+	case p.Symbol == "ppm" || p.matchUnitByKey("parts_per_million"):
 		unit = Concentration.PartsPerMillion
-		found = true
-	case "ppb":
+	case p.Symbol == "ppb" || p.matchUnitByKey("parts_per_billion"):
 		unit = Concentration.PartsPerBillion
-		found = true
+	default:
+		return Quantity[ConcentrationUnit]{}, fmt.Errorf("unknown concentration unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[ConcentrationUnit]{}, fmt.Errorf("unknown concentration unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewConcentration(jsonM.Value, unit), nil
+	return NewConcentration(p.Value, unit), nil
 }
 
 // MarshalDispersion serializes a Dispersion measurement to JSON
@@ -1137,40 +1184,30 @@ func MarshalDispersion(m Quantity[DispersionUnit]) ([]byte, error) {
 
 // UnmarshalDispersion deserializes a JSON representation to a Dispersion measurement
 func UnmarshalDispersion(data []byte) (Quantity[DispersionUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[DispersionUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "dispersion" {
-		return Quantity[DispersionUnit]{}, fmt.Errorf("expected dimension 'dispersion', got '%s'", jsonM.Dimension)
+	if p.Dimension != "dispersion" {
+		return Quantity[DispersionUnit]{}, fmt.Errorf("expected dimension 'dispersion', got '%s'", p.Dimension)
 	}
 
-	// Find the matching dispersion unit
 	var unit DispersionUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "ppm":
+	switch {
+	case p.Symbol == "ppm" || p.matchUnitByKey("parts_per_million"):
 		unit = Dispersion.PartsPerMillion
-		found = true
-	case "ppb":
+	case p.Symbol == "ppb" || p.matchUnitByKey("parts_per_billion"):
 		unit = Dispersion.PartsPerBillion
-		found = true
-	case "ppt":
+	case p.Symbol == "ppt" || p.matchUnitByKey("parts_per_trillion"):
 		unit = Dispersion.PartsPerTrillion
-		found = true
-	case "%":
+	case p.Symbol == "%" || p.matchUnitByKey("percent"):
 		unit = Dispersion.Percent
-		found = true
+	default:
+		return Quantity[DispersionUnit]{}, fmt.Errorf("unknown dispersion unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[DispersionUnit]{}, fmt.Errorf("unknown dispersion unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewDispersion(jsonM.Value, unit), nil
+	return NewDispersion(p.Value, unit), nil
 }
 
 // MarshalElectricCharge serializes an ElectricCharge measurement to JSON
@@ -1180,43 +1217,32 @@ func MarshalElectricCharge(m Quantity[ElectricChargeUnit]) ([]byte, error) {
 
 // UnmarshalElectricCharge deserializes a JSON representation to an ElectricCharge measurement
 func UnmarshalElectricCharge(data []byte) (Quantity[ElectricChargeUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[ElectricChargeUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "electric_charge" {
-		return Quantity[ElectricChargeUnit]{}, fmt.Errorf("expected dimension 'electric_charge', got '%s'", jsonM.Dimension)
+	if p.Dimension != "electric_charge" {
+		return Quantity[ElectricChargeUnit]{}, fmt.Errorf("expected dimension 'electric_charge', got '%s'", p.Dimension)
 	}
 
-	// Find the matching electric charge unit
 	var unit ElectricChargeUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "C":
+	switch {
+	case p.Symbol == "C" || p.matchUnitByKey("coulomb"):
 		unit = ElectricCharge.Coulomb
-		found = true
-	case "mC":
+	case p.Symbol == "mC" || p.matchUnitByKey("millicoulomb"):
 		unit = ElectricCharge.Millicoulomb
-		found = true
-	case "µC":
+	case p.Symbol == "µC" || p.matchUnitByKey("microcoulomb"):
 		unit = ElectricCharge.Microcoulomb
-		found = true
-	case "Ah":
+	case p.Symbol == "Ah" || p.matchUnitByKey("ampere_hour"):
 		unit = ElectricCharge.Ampere_Hour
-		found = true
-	case "mAh":
+	case p.Symbol == "mAh" || p.matchUnitByKey("milliampere_hour"):
 		unit = ElectricCharge.Milliampere_Hour
-		found = true
+	default:
+		return Quantity[ElectricChargeUnit]{}, fmt.Errorf("unknown electric charge unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[ElectricChargeUnit]{}, fmt.Errorf("unknown electric charge unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewElectricCharge(jsonM.Value, unit), nil
+	return NewElectricCharge(p.Value, unit), nil
 }
 
 // MarshalElectricCurrent serializes an ElectricCurrent measurement to JSON
@@ -1226,416 +1252,284 @@ func MarshalElectricCurrent(m Quantity[ElectricCurrentUnit]) ([]byte, error) {
 
 // UnmarshalElectricCurrent deserializes a JSON representation to an ElectricCurrent measurement
 func UnmarshalElectricCurrent(data []byte) (Quantity[ElectricCurrentUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[ElectricCurrentUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "electric_current" {
-		return Quantity[ElectricCurrentUnit]{}, fmt.Errorf("expected dimension 'electric_current', got '%s'", jsonM.Dimension)
+	if p.Dimension != "electric_current" {
+		return Quantity[ElectricCurrentUnit]{}, fmt.Errorf("expected dimension 'electric_current', got '%s'", p.Dimension)
 	}
 
-	// Find the matching electric current unit
 	var unit ElectricCurrentUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "A":
+	switch {
+	case p.Symbol == "A" || p.matchUnitByKey("ampere"):
 		unit = ElectricCurrent.Ampere
-		found = true
-	case "mA":
+	case p.Symbol == "mA" || p.matchUnitByKey("milliampere"):
 		unit = ElectricCurrent.Milliampere
-		found = true
-	case "µA":
+	case p.Symbol == "µA" || p.matchUnitByKey("microampere"):
 		unit = ElectricCurrent.Microampere
-		found = true
-	case "kA":
+	case p.Symbol == "kA" || p.matchUnitByKey("kiloampere"):
 		unit = ElectricCurrent.Kiloampere
-		found = true
+	default:
+		return Quantity[ElectricCurrentUnit]{}, fmt.Errorf("unknown electric current unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[ElectricCurrentUnit]{}, fmt.Errorf("unknown electric current unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewElectricCurrent(jsonM.Value, unit), nil
+	return NewElectricCurrent(p.Value, unit), nil
 }
 
 // MarshalSpeed serializes a Speed measurement to JSON
 func MarshalSpeed(m Quantity[SpeedUnit]) ([]byte, error) {
-	return json.Marshal(MeasurementJSON{
-		Value: m.Value,
-		Unit: UnitJSON{
-			Name:   m.Unit.Name(),
-			Symbol: m.Unit.Symbol(),
-		},
-		Dimension: m.Unit.Dimension(),
-	})
+	return marshalGeneric(m)
 }
 
 // UnmarshalSpeed deserializes a JSON representation to a Speed measurement
 func UnmarshalSpeed(data []byte) (Quantity[SpeedUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[SpeedUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "speed" {
-		return Quantity[SpeedUnit]{}, fmt.Errorf("expected dimension 'speed', got '%s'", jsonM.Dimension)
+	if p.Dimension != "speed" {
+		return Quantity[SpeedUnit]{}, fmt.Errorf("expected dimension 'speed', got '%s'", p.Dimension)
 	}
 
-	// Find the matching speed unit
 	var unit SpeedUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "m/s":
+	switch {
+	case p.Symbol == "m/s" || p.matchUnitByKey("meters_per_second"):
 		unit = Speed.MetersPerSecond
-		found = true
-	case "km/h":
+	case p.Symbol == "km/h" || p.matchUnitByKey("kilometers_per_hour"):
 		unit = Speed.KilometersPerHour
-		found = true
-	case "mph":
+	case p.Symbol == "mph" || p.matchUnitByKey("miles_per_hour"):
 		unit = Speed.MilesPerHour
-		found = true
-	case "ft/s":
+	case p.Symbol == "ft/s" || p.matchUnitByKey("feet_per_second"):
 		unit = Speed.FeetPerSecond
-		found = true
-	case "kn":
+	case p.Symbol == "kn" || p.matchUnitByKey("knot"):
 		unit = Speed.Knot
-		found = true
+	default:
+		return Quantity[SpeedUnit]{}, fmt.Errorf("unknown speed unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[SpeedUnit]{}, fmt.Errorf("unknown speed unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewSpeed(jsonM.Value, unit), nil
+	return NewSpeed(p.Value, unit), nil
 }
 
 // MarshalElectricPotentialDifference serializes an ElectricPotentialDifference measurement to JSON
 func MarshalElectricPotentialDifference(m Quantity[ElectricPotentialDifferenceUnit]) ([]byte, error) {
-	return json.Marshal(MeasurementJSON{
-		Value: m.Value,
-		Unit: UnitJSON{
-			Name:   m.Unit.Name(),
-			Symbol: m.Unit.Symbol(),
-		},
-		Dimension: m.Unit.Dimension(),
-	})
+	return marshalGeneric(m)
 }
 
 // UnmarshalElectricPotentialDifference deserializes a JSON representation to an ElectricPotentialDifference measurement
 func UnmarshalElectricPotentialDifference(data []byte) (Quantity[ElectricPotentialDifferenceUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[ElectricPotentialDifferenceUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "electric_potential_difference" {
-		return Quantity[ElectricPotentialDifferenceUnit]{}, fmt.Errorf("expected dimension 'electric_potential_difference', got '%s'", jsonM.Dimension)
+	if p.Dimension != "electric_potential_difference" {
+		return Quantity[ElectricPotentialDifferenceUnit]{}, fmt.Errorf("expected dimension 'electric_potential_difference', got '%s'", p.Dimension)
 	}
 
-	// Find the matching electric potential difference unit
 	var unit ElectricPotentialDifferenceUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "V":
+	switch {
+	case p.Symbol == "V" || p.matchUnitByKey("volt"):
 		unit = ElectricPotentialDifference.Volt
-		found = true
-	case "mV":
+	case p.Symbol == "mV" || p.matchUnitByKey("millivolt"):
 		unit = ElectricPotentialDifference.Millivolt
-		found = true
-	case "µV":
+	case p.Symbol == "µV" || p.matchUnitByKey("microvolt"):
 		unit = ElectricPotentialDifference.Microvolt
-		found = true
-	case "kV":
+	case p.Symbol == "kV" || p.matchUnitByKey("kilovolt"):
 		unit = ElectricPotentialDifference.Kilovolt
-		found = true
-	case "MV":
+	case p.Symbol == "MV" || p.matchUnitByKey("megavolt"):
 		unit = ElectricPotentialDifference.Megavolt
-		found = true
+	default:
+		return Quantity[ElectricPotentialDifferenceUnit]{}, fmt.Errorf("unknown electric potential difference unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[ElectricPotentialDifferenceUnit]{}, fmt.Errorf("unknown electric potential difference unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewElectricPotentialDifference(jsonM.Value, unit), nil
+	return NewElectricPotentialDifference(p.Value, unit), nil
 }
 
 // MarshalInformation serializes an Information measurement to JSON
 func MarshalInformation(m Quantity[InformationUnit]) ([]byte, error) {
-	return json.Marshal(MeasurementJSON{
-		Value: m.Value,
-		Unit: UnitJSON{
-			Name:   m.Unit.Name(),
-			Symbol: m.Unit.Symbol(),
-		},
-		Dimension: m.Unit.Dimension(),
-	})
+	return marshalGeneric(m)
 }
 
 // UnmarshalInformation deserializes a JSON representation to an Information measurement
 func UnmarshalInformation(data []byte) (Quantity[InformationUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[InformationUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "information" {
-		return Quantity[InformationUnit]{}, fmt.Errorf("expected dimension 'information', got '%s'", jsonM.Dimension)
+	if p.Dimension != "information" {
+		return Quantity[InformationUnit]{}, fmt.Errorf("expected dimension 'information', got '%s'", p.Dimension)
 	}
 
-	// Find the matching information unit
 	var unit InformationUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "bit":
+	switch {
+	case p.Symbol == "bit" || p.matchUnitByKey("bit"):
 		unit = Information.Bit
-		found = true
-	case "B":
+	case p.Symbol == "B" || p.matchUnitByKey("byte"):
 		unit = Information.Byte
-		found = true
-	case "KB":
+	case p.Symbol == "KB" || p.matchUnitByKey("kilobyte"):
 		unit = Information.Kilobyte
-		found = true
-	case "MB":
+	case p.Symbol == "MB" || p.matchUnitByKey("megabyte"):
 		unit = Information.Megabyte
-		found = true
-	case "GB":
+	case p.Symbol == "GB" || p.matchUnitByKey("gigabyte"):
 		unit = Information.Gigabyte
-		found = true
-	case "TB":
+	case p.Symbol == "TB" || p.matchUnitByKey("terabyte"):
 		unit = Information.Terabyte
-		found = true
-	case "PB":
+	case p.Symbol == "PB" || p.matchUnitByKey("petabyte"):
 		unit = Information.Petabyte
-		found = true
-	case "KiB":
+	case p.Symbol == "KiB" || p.matchUnitByKey("kibibyte"):
 		unit = Information.Kibibyte
-		found = true
-	case "MiB":
+	case p.Symbol == "MiB" || p.matchUnitByKey("mebibyte"):
 		unit = Information.Mebibyte
-		found = true
-	case "GiB":
+	case p.Symbol == "GiB" || p.matchUnitByKey("gibibyte"):
 		unit = Information.Gibibyte
-		found = true
-	case "TiB":
+	case p.Symbol == "TiB" || p.matchUnitByKey("tebibyte"):
 		unit = Information.Tebibyte
-		found = true
-	case "PiB":
+	case p.Symbol == "PiB" || p.matchUnitByKey("pebibyte"):
 		unit = Information.Pebibyte
-		found = true
+	default:
+		return Quantity[InformationUnit]{}, fmt.Errorf("unknown information unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[InformationUnit]{}, fmt.Errorf("unknown information unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewInformation(jsonM.Value, unit), nil
+	return NewInformation(p.Value, unit), nil
 }
 
 // MarshalFrequency serializes a Frequency measurement to JSON
 func MarshalFrequency(m Quantity[FrequencyUnit]) ([]byte, error) {
-	return json.Marshal(MeasurementJSON{
-		Value: m.Value,
-		Unit: UnitJSON{
-			Name:   m.Unit.Name(),
-			Symbol: m.Unit.Symbol(),
-		},
-		Dimension: m.Unit.Dimension(),
-	})
+	return marshalGeneric(m)
 }
 
 // UnmarshalFrequency deserializes a JSON representation to a Frequency measurement
 func UnmarshalFrequency(data []byte) (Quantity[FrequencyUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[FrequencyUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "frequency" {
-		return Quantity[FrequencyUnit]{}, fmt.Errorf("expected dimension 'frequency', got '%s'", jsonM.Dimension)
+	if p.Dimension != "frequency" {
+		return Quantity[FrequencyUnit]{}, fmt.Errorf("expected dimension 'frequency', got '%s'", p.Dimension)
 	}
 
-	// Find the matching frequency unit
 	var unit FrequencyUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "Hz":
+	switch {
+	case p.Symbol == "Hz" || p.matchUnitByKey("hertz"):
 		unit = Frequency.Hertz
-		found = true
-	case "kHz":
+	case p.Symbol == "kHz" || p.matchUnitByKey("kilohertz"):
 		unit = Frequency.Kilohertz
-		found = true
-	case "MHz":
+	case p.Symbol == "MHz" || p.matchUnitByKey("megahertz"):
 		unit = Frequency.Megahertz
-		found = true
-	case "GHz":
+	case p.Symbol == "GHz" || p.matchUnitByKey("gigahertz"):
 		unit = Frequency.Gigahertz
-		found = true
-	case "THz":
+	case p.Symbol == "THz" || p.matchUnitByKey("terahertz"):
 		unit = Frequency.Terahertz
-		found = true
-	case "rpm":
+	case p.Symbol == "rpm" || p.matchUnitByKey("rpm"):
 		unit = Frequency.RPM
-		found = true
+	default:
+		return Quantity[FrequencyUnit]{}, fmt.Errorf("unknown frequency unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[FrequencyUnit]{}, fmt.Errorf("unknown frequency unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewFrequency(jsonM.Value, unit), nil
+	return NewFrequency(p.Value, unit), nil
 }
 
 // MarshalIlluminance serializes an Illuminance measurement to JSON
 func MarshalIlluminance(m Quantity[IlluminanceUnit]) ([]byte, error) {
-	return json.Marshal(MeasurementJSON{
-		Value: m.Value,
-		Unit: UnitJSON{
-			Name:   m.Unit.Name(),
-			Symbol: m.Unit.Symbol(),
-		},
-		Dimension: m.Unit.Dimension(),
-	})
+	return marshalGeneric(m)
 }
 
 // UnmarshalIlluminance deserializes a JSON representation to an Illuminance measurement
 func UnmarshalIlluminance(data []byte) (Quantity[IlluminanceUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[IlluminanceUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "illuminance" {
-		return Quantity[IlluminanceUnit]{}, fmt.Errorf("expected dimension 'illuminance', got '%s'", jsonM.Dimension)
+	if p.Dimension != "illuminance" {
+		return Quantity[IlluminanceUnit]{}, fmt.Errorf("expected dimension 'illuminance', got '%s'", p.Dimension)
 	}
 
-	// Find the matching illuminance unit
 	var unit IlluminanceUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "lx":
+	switch {
+	case p.Symbol == "lx" || p.matchUnitByKey("lux"):
 		unit = Illuminance.Lux
-		found = true
-	case "fc":
+	case p.Symbol == "fc" || p.matchUnitByKey("foot_candle"):
 		unit = Illuminance.FootCandle
-		found = true
-	case "ph":
+	case p.Symbol == "ph" || p.matchUnitByKey("phot"):
 		unit = Illuminance.Phot
-		found = true
-	case "nx":
+	case p.Symbol == "nx" || p.matchUnitByKey("nox"):
 		unit = Illuminance.Nox
-		found = true
+	default:
+		return Quantity[IlluminanceUnit]{}, fmt.Errorf("unknown illuminance unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[IlluminanceUnit]{}, fmt.Errorf("unknown illuminance unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewIlluminance(jsonM.Value, unit), nil
+	return NewIlluminance(p.Value, unit), nil
 }
 
 // MarshalGeneral serializes a General measurement to JSON
 func MarshalGeneral(m Quantity[GeneralUnit]) ([]byte, error) {
-	return json.Marshal(MeasurementJSON{
-		Value: m.Value,
-		Unit: UnitJSON{
-			Name:   m.Unit.Name(),
-			Symbol: m.Unit.Symbol(),
-		},
-		Dimension: m.Unit.Dimension(),
-	})
+	return marshalGeneric(m)
 }
 
 // MarshalFuelEfficiency serializes a FuelEfficiency measurement to JSON
 func MarshalFuelEfficiency(m Quantity[FuelEfficiencyUnit]) ([]byte, error) {
-	return json.Marshal(MeasurementJSON{
-		Value: m.Value,
-		Unit: UnitJSON{
-			Name:   m.Unit.Name(),
-			Symbol: m.Unit.Symbol(),
-		},
-		Dimension: m.Unit.Dimension(),
-	})
+	return marshalGeneric(m)
 }
 
 // UnmarshalGeneral deserializes a JSON representation to a General measurement
 func UnmarshalGeneral(data []byte) (Quantity[GeneralUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[GeneralUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "general" {
-		return Quantity[GeneralUnit]{}, fmt.Errorf("expected dimension 'general', got '%s'", jsonM.Dimension)
+	if p.Dimension != "general" {
+		return Quantity[GeneralUnit]{}, fmt.Errorf("expected dimension 'general', got '%s'", p.Dimension)
 	}
 
-	// Find the matching general unit
 	var unit GeneralUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "unit":
+	switch {
+	case p.Symbol == "unit" || p.matchUnitByKey("unit"):
 		unit = General.Unit
-		found = true
 	default:
 		// For custom units, create a new general unit with the given symbol and name
-		unit = NewGeneralUnit(jsonM.Unit.Symbol, jsonM.Unit.Name)
-		found = true
+		symbolOrKey := p.Symbol
+		if symbolOrKey == "" && p.Key != "" {
+			_, symbolOrKey = parseUnitKey(p.Key)
+		}
+		name := p.Name
+		if name == "" {
+			name = symbolOrKey
+		}
+		unit = NewGeneralUnit(symbolOrKey, name)
 	}
 
-	if !found {
-		return Quantity[GeneralUnit]{}, fmt.Errorf("unknown general unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewGeneral(jsonM.Value, unit), nil
+	return NewGeneral(p.Value, unit), nil
 }
 
 // UnmarshalFuelEfficiency deserializes a JSON representation to a FuelEfficiency measurement
 func UnmarshalFuelEfficiency(data []byte) (Quantity[FuelEfficiencyUnit], error) {
-	var jsonM MeasurementJSON
-	if err := json.Unmarshal(data, &jsonM); err != nil {
+	p, err := parseMeasurement(data)
+	if err != nil {
 		return Quantity[FuelEfficiencyUnit]{}, err
 	}
 
-	// Verify dimension
-	if jsonM.Dimension != "fuel_efficiency" {
-		return Quantity[FuelEfficiencyUnit]{}, fmt.Errorf("expected dimension 'fuel_efficiency', got '%s'", jsonM.Dimension)
+	if p.Dimension != "fuel_efficiency" {
+		return Quantity[FuelEfficiencyUnit]{}, fmt.Errorf("expected dimension 'fuel_efficiency', got '%s'", p.Dimension)
 	}
 
-	// Find the matching fuel efficiency unit
 	var unit FuelEfficiencyUnit
-	found := false
-
-	switch jsonM.Unit.Symbol {
-	case "km/L":
+	switch {
+	case p.Symbol == "km/L" || p.matchUnitByKey("kilometers_per_liter"):
 		unit = FuelEfficiency.KilometersPerLiter
-		found = true
-	case "mpg":
+	case p.Symbol == "mpg" || p.matchUnitByKey("miles_per_gallon"):
 		unit = FuelEfficiency.MilesPerGallon
-		found = true
-	case "L/100km":
+	case p.Symbol == "L/100km" || p.matchUnitByKey("liters_per_100_kilometers"):
 		unit = FuelEfficiency.LitersPer100Kilometers
-		found = true
+	default:
+		return Quantity[FuelEfficiencyUnit]{}, fmt.Errorf("unknown fuel efficiency unit: symbol=%s, key=%s", p.Symbol, p.Key)
 	}
 
-	if !found {
-		return Quantity[FuelEfficiencyUnit]{}, fmt.Errorf("unknown fuel efficiency unit: %s", jsonM.Unit.Symbol)
-	}
-
-	return NewFuelEfficiency(jsonM.Value, unit), nil
+	return NewFuelEfficiency(p.Value, unit), nil
 }

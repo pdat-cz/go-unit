@@ -115,8 +115,8 @@ func TestFrequencySerialization(t *testing.T) {
 	if unitData["name"].(string) != "Hertz" {
 		t.Errorf("Expected unit name to be Hertz, got %s", unitData["name"].(string))
 	}
-	if jsonData["dimension"].(string) != "frequency" {
-		t.Errorf("Expected dimension to be frequency, got %s", jsonData["dimension"].(string))
+	if unitData["dimension"].(string) != "frequency" {
+		t.Errorf("Expected dimension to be frequency, got %s", unitData["dimension"].(string))
 	}
 
 	// Deserialize back to a measurement

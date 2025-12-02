@@ -109,8 +109,8 @@ func TestInformationSerialization(t *testing.T) {
 	if unitData["name"].(string) != "Kibibyte" {
 		t.Errorf("Expected unit name to be Kibibyte, got %s", unitData["name"].(string))
 	}
-	if jsonData["dimension"].(string) != "information" {
-		t.Errorf("Expected dimension to be information, got %s", jsonData["dimension"].(string))
+	if unitData["dimension"].(string) != "information" {
+		t.Errorf("Expected dimension to be information, got %s", unitData["dimension"].(string))
 	}
 
 	// Test deserialization

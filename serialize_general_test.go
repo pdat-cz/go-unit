@@ -123,8 +123,8 @@ func TestMarshalAndUnmarshalGeneral(t *testing.T) {
 			if jsonM.Unit.Symbol != tc.expectedSymbol {
 				t.Errorf("Expected unit symbol to be '%s', got '%s'", tc.expectedSymbol, jsonM.Unit.Symbol)
 			}
-			if jsonM.Dimension != tc.expectedDimension {
-				t.Errorf("Expected dimension to be '%s', got '%s'", tc.expectedDimension, jsonM.Dimension)
+			if jsonM.Unit.Dimension != tc.expectedDimension {
+				t.Errorf("Expected dimension to be '%s', got '%s'", tc.expectedDimension, jsonM.Unit.Dimension)
 			}
 
 			// Unmarshal back to a measurement

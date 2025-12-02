@@ -32,8 +32,8 @@ func TestTemperatureSerialization(t *testing.T) {
 	if unitData["name"] != "Celsius" {
 		t.Errorf("Expected unit name Celsius, got %v", unitData["name"])
 	}
-	if jsonM["dimension"] != "temperature" {
-		t.Errorf("Expected dimension temperature, got %v", jsonM["dimension"])
+	if unitData["dimension"] != "temperature" {
+		t.Errorf("Expected dimension temperature, got %v", unitData["dimension"])
 	}
 
 	// Deserialize back to a measurement
@@ -75,8 +75,8 @@ func TestPressureSerialization(t *testing.T) {
 	if unitData["name"] != "Kilopascal" {
 		t.Errorf("Expected unit name Kilopascal, got %v", unitData["name"])
 	}
-	if jsonM["dimension"] != "pressure" {
-		t.Errorf("Expected dimension pressure, got %v", jsonM["dimension"])
+	if unitData["dimension"] != "pressure" {
+		t.Errorf("Expected dimension pressure, got %v", unitData["dimension"])
 	}
 
 	// Deserialize back to a measurement

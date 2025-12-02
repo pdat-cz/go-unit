@@ -74,7 +74,7 @@ func TestMarshalCompactTemperature(t *testing.T) {
 		t.Fatalf("MarshalCompactTemperature failed: %v", err)
 	}
 
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		t.Fatalf("Failed to unmarshal result: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestMarshalCompactTemperatureWithSymbol(t *testing.T) {
 		t.Fatalf("MarshalCompactTemperatureWithSymbol failed: %v", err)
 	}
 
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		t.Fatalf("Failed to unmarshal result: %v", err)
 	}
@@ -448,7 +448,7 @@ func TestMarshalCompactAllDimensions(t *testing.T) {
 				t.Fatalf("Marshal failed: %v", err)
 			}
 
-			var cj CompactJSON
+			var cj legacyCompactJSON
 			if err := json.Unmarshal(data, &cj); err != nil {
 				t.Fatalf("Failed to unmarshal result: %v", err)
 			}

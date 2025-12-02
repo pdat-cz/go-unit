@@ -115,8 +115,8 @@ func TestIlluminanceSerialization(t *testing.T) {
 	if unitData["name"].(string) != "Lux" {
 		t.Errorf("Expected unit name to be Lux, got %s", unitData["name"].(string))
 	}
-	if jsonData["dimension"].(string) != "illuminance" {
-		t.Errorf("Expected dimension to be illuminance, got %s", jsonData["dimension"].(string))
+	if unitData["dimension"].(string) != "illuminance" {
+		t.Errorf("Expected dimension to be illuminance, got %s", unitData["dimension"].(string))
 	}
 
 	// Deserialize back to a measurement

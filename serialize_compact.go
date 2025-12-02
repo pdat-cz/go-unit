@@ -18,11 +18,11 @@ var temperatureUnitsByKey = map[string]TemperatureUnit{
 }
 
 var pressureUnitsByKey = map[string]PressureUnit{
-	"pressure_pascal":                    Pressure.Pascal,
-	"pressure_kilopascal":                Pressure.Kilopascal,
-	"pressure_bar":                       Pressure.Bar,
-	"pressure_pounds_per_square_inch":    Pressure.PSI,
-	"pressure_inches_of_water_column":    Pressure.InchH2O,
+	"pressure_pascal":                 Pressure.Pascal,
+	"pressure_kilopascal":             Pressure.Kilopascal,
+	"pressure_bar":                    Pressure.Bar,
+	"pressure_pounds_per_square_inch": Pressure.PSI,
+	"pressure_inches_of_water_column": Pressure.InchH2O,
 }
 
 var lengthUnitsByKey = map[string]LengthUnit{
@@ -100,11 +100,11 @@ var volumeUnitsByKey = map[string]VolumeUnit{
 }
 
 var speedUnitsByKey = map[string]SpeedUnit{
-	"speed_meters_per_second":    Speed.MetersPerSecond,
-	"speed_kilometers_per_hour":  Speed.KilometersPerHour,
-	"speed_miles_per_hour":       Speed.MilesPerHour,
-	"speed_feet_per_second":      Speed.FeetPerSecond,
-	"speed_knot":                 Speed.Knot,
+	"speed_meters_per_second":   Speed.MetersPerSecond,
+	"speed_kilometers_per_hour": Speed.KilometersPerHour,
+	"speed_miles_per_hour":      Speed.MilesPerHour,
+	"speed_feet_per_second":     Speed.FeetPerSecond,
+	"speed_knot":                Speed.Knot,
 }
 
 var accelerationUnitsByKey = map[string]AccelerationUnit{
@@ -120,8 +120,8 @@ var flowRateUnitsByKey = map[string]FlowRateUnit{
 }
 
 var powerUnitsByKey = map[string]PowerUnit{
-	"power_watt":         Power.Watt,
-	"power_kilowatt":     Power.Kilowatt,
+	"power_watt":           Power.Watt,
+	"power_kilowatt":       Power.Kilowatt,
 	"power_b_t_u_per_hour": Power.BTUPerHour,
 }
 
@@ -146,10 +146,10 @@ var dispersionUnitsByKey = map[string]DispersionUnit{
 }
 
 var electricChargeUnitsByKey = map[string]ElectricChargeUnit{
-	"electric_charge_coulomb":          ElectricCharge.Coulomb,
-	"electric_charge_millicoulomb":     ElectricCharge.Millicoulomb,
-	"electric_charge_microcoulomb":     ElectricCharge.Microcoulomb,
-	"electric_charge_ampere__hour":     ElectricCharge.Ampere_Hour,
+	"electric_charge_coulomb":           ElectricCharge.Coulomb,
+	"electric_charge_millicoulomb":      ElectricCharge.Millicoulomb,
+	"electric_charge_microcoulomb":      ElectricCharge.Microcoulomb,
+	"electric_charge_ampere__hour":      ElectricCharge.Ampere_Hour,
 	"electric_charge_milliampere__hour": ElectricCharge.Milliampere_Hour,
 }
 
@@ -200,15 +200,15 @@ var informationUnitsByKey = map[string]InformationUnit{
 }
 
 var fuelEfficiencyUnitsByKey = map[string]FuelEfficiencyUnit{
-	"fuel_efficiency_kilometers_per_liter":      FuelEfficiency.KilometersPerLiter,
-	"fuel_efficiency_miles_per_gallon":          FuelEfficiency.MilesPerGallon,
+	"fuel_efficiency_kilometers_per_liter":     FuelEfficiency.KilometersPerLiter,
+	"fuel_efficiency_miles_per_gallon":         FuelEfficiency.MilesPerGallon,
 	"fuel_efficiency_liters_per100_kilometers": FuelEfficiency.LitersPer100Kilometers,
 }
 
 // marshalCompactGeneric is a helper function to serialize any measurement to compact JSON
 func marshalCompactGeneric[T Category](m Quantity[T], includeSymbol bool) ([]byte, error) {
 	key := unitKey(m.Unit.Dimension(), m.Unit.Name())
-	cj := CompactJSON{
+	cj := legacyCompactJSON{
 		Value: m.Value,
 		Unit:  key,
 	}
@@ -230,7 +230,7 @@ func MarshalCompactTemperatureWithSymbol(m Quantity[TemperatureUnit]) ([]byte, e
 
 // UnmarshalCompactTemperature deserializes compact JSON to a Temperature measurement
 func UnmarshalCompactTemperature(data []byte) (Quantity[TemperatureUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[TemperatureUnit]{}, err
 	}
@@ -253,7 +253,7 @@ func MarshalCompactPressureWithSymbol(m Quantity[PressureUnit]) ([]byte, error) 
 
 // UnmarshalCompactPressure deserializes compact JSON to a Pressure measurement
 func UnmarshalCompactPressure(data []byte) (Quantity[PressureUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[PressureUnit]{}, err
 	}
@@ -276,7 +276,7 @@ func MarshalCompactLengthWithSymbol(m Quantity[LengthUnit]) ([]byte, error) {
 
 // UnmarshalCompactLength deserializes compact JSON to a Length measurement
 func UnmarshalCompactLength(data []byte) (Quantity[LengthUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[LengthUnit]{}, err
 	}
@@ -299,7 +299,7 @@ func MarshalCompactMassWithSymbol(m Quantity[MassUnit]) ([]byte, error) {
 
 // UnmarshalCompactMass deserializes compact JSON to a Mass measurement
 func UnmarshalCompactMass(data []byte) (Quantity[MassUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[MassUnit]{}, err
 	}
@@ -322,7 +322,7 @@ func MarshalCompactDurationWithSymbol(m Quantity[DurationUnit]) ([]byte, error) 
 
 // UnmarshalCompactDuration deserializes compact JSON to a Duration measurement
 func UnmarshalCompactDuration(data []byte) (Quantity[DurationUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[DurationUnit]{}, err
 	}
@@ -345,7 +345,7 @@ func MarshalCompactAngleWithSymbol(m Quantity[AngleUnit]) ([]byte, error) {
 
 // UnmarshalCompactAngle deserializes compact JSON to an Angle measurement
 func UnmarshalCompactAngle(data []byte) (Quantity[AngleUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[AngleUnit]{}, err
 	}
@@ -368,7 +368,7 @@ func MarshalCompactAreaWithSymbol(m Quantity[AreaUnit]) ([]byte, error) {
 
 // UnmarshalCompactArea deserializes compact JSON to an Area measurement
 func UnmarshalCompactArea(data []byte) (Quantity[AreaUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[AreaUnit]{}, err
 	}
@@ -391,7 +391,7 @@ func MarshalCompactVolumeWithSymbol(m Quantity[VolumeUnit]) ([]byte, error) {
 
 // UnmarshalCompactVolume deserializes compact JSON to a Volume measurement
 func UnmarshalCompactVolume(data []byte) (Quantity[VolumeUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[VolumeUnit]{}, err
 	}
@@ -414,7 +414,7 @@ func MarshalCompactSpeedWithSymbol(m Quantity[SpeedUnit]) ([]byte, error) {
 
 // UnmarshalCompactSpeed deserializes compact JSON to a Speed measurement
 func UnmarshalCompactSpeed(data []byte) (Quantity[SpeedUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[SpeedUnit]{}, err
 	}
@@ -437,7 +437,7 @@ func MarshalCompactAccelerationWithSymbol(m Quantity[AccelerationUnit]) ([]byte,
 
 // UnmarshalCompactAcceleration deserializes compact JSON to an Acceleration measurement
 func UnmarshalCompactAcceleration(data []byte) (Quantity[AccelerationUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[AccelerationUnit]{}, err
 	}
@@ -460,7 +460,7 @@ func MarshalCompactFlowRateWithSymbol(m Quantity[FlowRateUnit]) ([]byte, error) 
 
 // UnmarshalCompactFlowRate deserializes compact JSON to a FlowRate measurement
 func UnmarshalCompactFlowRate(data []byte) (Quantity[FlowRateUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[FlowRateUnit]{}, err
 	}
@@ -483,7 +483,7 @@ func MarshalCompactPowerWithSymbol(m Quantity[PowerUnit]) ([]byte, error) {
 
 // UnmarshalCompactPower deserializes compact JSON to a Power measurement
 func UnmarshalCompactPower(data []byte) (Quantity[PowerUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[PowerUnit]{}, err
 	}
@@ -506,7 +506,7 @@ func MarshalCompactEnergyWithSymbol(m Quantity[EnergyUnit]) ([]byte, error) {
 
 // UnmarshalCompactEnergy deserializes compact JSON to an Energy measurement
 func UnmarshalCompactEnergy(data []byte) (Quantity[EnergyUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[EnergyUnit]{}, err
 	}
@@ -529,7 +529,7 @@ func MarshalCompactConcentrationWithSymbol(m Quantity[ConcentrationUnit]) ([]byt
 
 // UnmarshalCompactConcentration deserializes compact JSON to a Concentration measurement
 func UnmarshalCompactConcentration(data []byte) (Quantity[ConcentrationUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[ConcentrationUnit]{}, err
 	}
@@ -552,7 +552,7 @@ func MarshalCompactDispersionWithSymbol(m Quantity[DispersionUnit]) ([]byte, err
 
 // UnmarshalCompactDispersion deserializes compact JSON to a Dispersion measurement
 func UnmarshalCompactDispersion(data []byte) (Quantity[DispersionUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[DispersionUnit]{}, err
 	}
@@ -575,7 +575,7 @@ func MarshalCompactElectricChargeWithSymbol(m Quantity[ElectricChargeUnit]) ([]b
 
 // UnmarshalCompactElectricCharge deserializes compact JSON to an ElectricCharge measurement
 func UnmarshalCompactElectricCharge(data []byte) (Quantity[ElectricChargeUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[ElectricChargeUnit]{}, err
 	}
@@ -598,7 +598,7 @@ func MarshalCompactElectricCurrentWithSymbol(m Quantity[ElectricCurrentUnit]) ([
 
 // UnmarshalCompactElectricCurrent deserializes compact JSON to an ElectricCurrent measurement
 func UnmarshalCompactElectricCurrent(data []byte) (Quantity[ElectricCurrentUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[ElectricCurrentUnit]{}, err
 	}
@@ -621,7 +621,7 @@ func MarshalCompactElectricPotentialDifferenceWithSymbol(m Quantity[ElectricPote
 
 // UnmarshalCompactElectricPotentialDifference deserializes compact JSON to an ElectricPotentialDifference measurement
 func UnmarshalCompactElectricPotentialDifference(data []byte) (Quantity[ElectricPotentialDifferenceUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[ElectricPotentialDifferenceUnit]{}, err
 	}
@@ -644,7 +644,7 @@ func MarshalCompactFrequencyWithSymbol(m Quantity[FrequencyUnit]) ([]byte, error
 
 // UnmarshalCompactFrequency deserializes compact JSON to a Frequency measurement
 func UnmarshalCompactFrequency(data []byte) (Quantity[FrequencyUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[FrequencyUnit]{}, err
 	}
@@ -667,7 +667,7 @@ func MarshalCompactIlluminanceWithSymbol(m Quantity[IlluminanceUnit]) ([]byte, e
 
 // UnmarshalCompactIlluminance deserializes compact JSON to an Illuminance measurement
 func UnmarshalCompactIlluminance(data []byte) (Quantity[IlluminanceUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[IlluminanceUnit]{}, err
 	}
@@ -690,7 +690,7 @@ func MarshalCompactInformationWithSymbol(m Quantity[InformationUnit]) ([]byte, e
 
 // UnmarshalCompactInformation deserializes compact JSON to an Information measurement
 func UnmarshalCompactInformation(data []byte) (Quantity[InformationUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[InformationUnit]{}, err
 	}
@@ -713,7 +713,7 @@ func MarshalCompactFuelEfficiencyWithSymbol(m Quantity[FuelEfficiencyUnit]) ([]b
 
 // UnmarshalCompactFuelEfficiency deserializes compact JSON to a FuelEfficiency measurement
 func UnmarshalCompactFuelEfficiency(data []byte) (Quantity[FuelEfficiencyUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[FuelEfficiencyUnit]{}, err
 	}
@@ -736,7 +736,7 @@ func MarshalCompactGeneralWithSymbol(m Quantity[GeneralUnit]) ([]byte, error) {
 
 // UnmarshalCompactGeneral deserializes compact JSON to a General measurement
 func UnmarshalCompactGeneral(data []byte) (Quantity[GeneralUnit], error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return Quantity[GeneralUnit]{}, err
 	}
@@ -756,7 +756,7 @@ func UnmarshalCompactGeneral(data []byte) (Quantity[GeneralUnit], error) {
 
 // unmarshalCompactMeasurement deserializes compact JSON to an AnyMeasurement
 func unmarshalCompactMeasurement(data []byte) (*AnyMeasurement, error) {
-	var cj CompactJSON
+	var cj legacyCompactJSON
 	if err := json.Unmarshal(data, &cj); err != nil {
 		return nil, err
 	}
