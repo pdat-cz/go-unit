@@ -63,6 +63,8 @@ The package includes several predefined unit types:
 - `DispersionUnit`: PartsPerMillion, PartsPerBillion, PartsPerTrillion, Percent
 - `ElectricChargeUnit`: Coulomb, Millicoulomb, Microcoulomb, Ampere_Hour, Milliampere_Hour
 - `ElectricCurrentUnit`: Ampere, Milliampere, Microampere, Kiloampere
+- `ElectricPotentialDifferenceUnit`: Volt, Millivolt, Microvolt, Kilovolt, Megavolt
+- `SpeedUnit`: MetersPerSecond, KilometersPerHour, MilesPerHour, FeetPerSecond, Knot
 - `FrequencyUnit`: Hertz, Kilohertz, Megahertz, Gigahertz, Terahertz, RPM
 - `FuelEfficiencyUnit`: KilometersPerLiter, MilesPerGallon, LitersPer100Kilometers
 - `IlluminanceUnit`: Lux, FootCandle, Phot, Nox

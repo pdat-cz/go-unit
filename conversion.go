@@ -690,6 +690,276 @@ func ParseElectricPotentialDifference(s string) (Quantity[ElectricPotentialDiffe
 	return NewElectricPotentialDifference(value, unit), nil
 }
 
+// ParseEnergy parses a string like "100 J" into an Energy measurement
+func ParseEnergy(s string) (Quantity[EnergyUnit], error) {
+	value, unitStr, err := parseValueAndUnit(s)
+	if err != nil {
+		return Quantity[EnergyUnit]{}, err
+	}
+
+	// Find the matching energy unit
+	var unit EnergyUnit
+	found := false
+
+	switch strings.ToLower(unitStr) {
+	case "j", "joule", "joules":
+		unit = Energy.Joule
+		found = true
+	case "kwh", "kilowatt-hour", "kilowatt-hours", "kilowatthour", "kilowatthours":
+		unit = Energy.KilowattHour
+		found = true
+	case "btu", "british thermal unit", "british thermal units":
+		unit = Energy.BTU
+		found = true
+	}
+
+	if !found {
+		return Quantity[EnergyUnit]{}, ParseError{
+			Input: s,
+			Msg:   fmt.Sprintf("unknown energy unit: %s", unitStr),
+		}
+	}
+
+	return NewEnergy(value, unit), nil
+}
+
+// ParsePower parses a string like "100 W" into a Power measurement
+func ParsePower(s string) (Quantity[PowerUnit], error) {
+	value, unitStr, err := parseValueAndUnit(s)
+	if err != nil {
+		return Quantity[PowerUnit]{}, err
+	}
+
+	// Find the matching power unit
+	var unit PowerUnit
+	found := false
+
+	switch strings.ToLower(unitStr) {
+	case "w", "watt", "watts":
+		unit = Power.Watt
+		found = true
+	case "kw", "kilowatt", "kilowatts":
+		unit = Power.Kilowatt
+		found = true
+	case "btu/h", "btu/hr", "btu per hour":
+		unit = Power.BTUPerHour
+		found = true
+	}
+
+	if !found {
+		return Quantity[PowerUnit]{}, ParseError{
+			Input: s,
+			Msg:   fmt.Sprintf("unknown power unit: %s", unitStr),
+		}
+	}
+
+	return NewPower(value, unit), nil
+}
+
+// ParseFlowRate parses a string like "10 m³/h" into a FlowRate measurement
+func ParseFlowRate(s string) (Quantity[FlowRateUnit], error) {
+	value, unitStr, err := parseValueAndUnit(s)
+	if err != nil {
+		return Quantity[FlowRateUnit]{}, err
+	}
+
+	// Find the matching flow rate unit
+	var unit FlowRateUnit
+	found := false
+
+	switch strings.ToLower(unitStr) {
+	case "m³/h", "m3/h", "cubic meters per hour", "cubic metres per hour":
+		unit = FlowRate.CubicMetersPerHour
+		found = true
+	case "l/s", "liters per second", "litres per second":
+		unit = FlowRate.LitersPerSecond
+		found = true
+	case "cfm", "cubic feet per minute":
+		unit = FlowRate.CFM
+		found = true
+	}
+
+	if !found {
+		return Quantity[FlowRateUnit]{}, ParseError{
+			Input: s,
+			Msg:   fmt.Sprintf("unknown flow rate unit: %s", unitStr),
+		}
+	}
+
+	return NewFlowRate(value, unit), nil
+}
+
+// ParseFrequency parses a string like "1000 Hz" into a Frequency measurement
+func ParseFrequency(s string) (Quantity[FrequencyUnit], error) {
+	value, unitStr, err := parseValueAndUnit(s)
+	if err != nil {
+		return Quantity[FrequencyUnit]{}, err
+	}
+
+	// Find the matching frequency unit
+	var unit FrequencyUnit
+	found := false
+
+	switch strings.ToLower(unitStr) {
+	case "hz", "hertz":
+		unit = Frequency.Hertz
+		found = true
+	case "khz", "kilohertz":
+		unit = Frequency.Kilohertz
+		found = true
+	case "mhz", "megahertz":
+		unit = Frequency.Megahertz
+		found = true
+	case "ghz", "gigahertz":
+		unit = Frequency.Gigahertz
+		found = true
+	case "thz", "terahertz":
+		unit = Frequency.Terahertz
+		found = true
+	case "rpm", "revolutions per minute":
+		unit = Frequency.RPM
+		found = true
+	}
+
+	if !found {
+		return Quantity[FrequencyUnit]{}, ParseError{
+			Input: s,
+			Msg:   fmt.Sprintf("unknown frequency unit: %s", unitStr),
+		}
+	}
+
+	return NewFrequency(value, unit), nil
+}
+
+// ParseIlluminance parses a string like "500 lx" into an Illuminance measurement
+func ParseIlluminance(s string) (Quantity[IlluminanceUnit], error) {
+	value, unitStr, err := parseValueAndUnit(s)
+	if err != nil {
+		return Quantity[IlluminanceUnit]{}, err
+	}
+
+	// Find the matching illuminance unit
+	var unit IlluminanceUnit
+	found := false
+
+	switch strings.ToLower(unitStr) {
+	case "lx", "lux":
+		unit = Illuminance.Lux
+		found = true
+	case "fc", "foot-candle", "foot-candles", "footcandle", "footcandles":
+		unit = Illuminance.FootCandle
+		found = true
+	case "ph", "phot", "phots":
+		unit = Illuminance.Phot
+		found = true
+	case "nx", "nox":
+		unit = Illuminance.Nox
+		found = true
+	}
+
+	if !found {
+		return Quantity[IlluminanceUnit]{}, ParseError{
+			Input: s,
+			Msg:   fmt.Sprintf("unknown illuminance unit: %s", unitStr),
+		}
+	}
+
+	return NewIlluminance(value, unit), nil
+}
+
+// ParseInformation parses a string like "500 MB" into an Information measurement
+func ParseInformation(s string) (Quantity[InformationUnit], error) {
+	value, unitStr, err := parseValueAndUnit(s)
+	if err != nil {
+		return Quantity[InformationUnit]{}, err
+	}
+
+	// Find the matching information unit
+	var unit InformationUnit
+	found := false
+
+	switch unitStr {
+	case "bit", "bits":
+		unit = Information.Bit
+		found = true
+	case "B", "byte", "bytes":
+		unit = Information.Byte
+		found = true
+	case "KB", "kilobyte", "kilobytes":
+		unit = Information.Kilobyte
+		found = true
+	case "MB", "megabyte", "megabytes":
+		unit = Information.Megabyte
+		found = true
+	case "GB", "gigabyte", "gigabytes":
+		unit = Information.Gigabyte
+		found = true
+	case "TB", "terabyte", "terabytes":
+		unit = Information.Terabyte
+		found = true
+	case "PB", "petabyte", "petabytes":
+		unit = Information.Petabyte
+		found = true
+	case "KiB", "kibibyte", "kibibytes":
+		unit = Information.Kibibyte
+		found = true
+	case "MiB", "mebibyte", "mebibytes":
+		unit = Information.Mebibyte
+		found = true
+	case "GiB", "gibibyte", "gibibytes":
+		unit = Information.Gibibyte
+		found = true
+	case "TiB", "tebibyte", "tebibytes":
+		unit = Information.Tebibyte
+		found = true
+	case "PiB", "pebibyte", "pebibytes":
+		unit = Information.Pebibyte
+		found = true
+	}
+
+	if !found {
+		return Quantity[InformationUnit]{}, ParseError{
+			Input: s,
+			Msg:   fmt.Sprintf("unknown information unit: %s", unitStr),
+		}
+	}
+
+	return NewInformation(value, unit), nil
+}
+
+// ParseFuelEfficiency parses a string like "10 km/L" into a FuelEfficiency measurement
+func ParseFuelEfficiency(s string) (Quantity[FuelEfficiencyUnit], error) {
+	value, unitStr, err := parseValueAndUnit(s)
+	if err != nil {
+		return Quantity[FuelEfficiencyUnit]{}, err
+	}
+
+	// Find the matching fuel efficiency unit
+	var unit FuelEfficiencyUnit
+	found := false
+
+	switch strings.ToLower(unitStr) {
+	case "km/l", "kilometers per liter", "kilometres per litre":
+		unit = FuelEfficiency.KilometersPerLiter
+		found = true
+	case "mpg", "miles per gallon":
+		unit = FuelEfficiency.MilesPerGallon
+		found = true
+	case "l/100km", "liters per 100 kilometers", "litres per 100 kilometres":
+		unit = FuelEfficiency.LitersPer100Kilometers
+		found = true
+	}
+
+	if !found {
+		return Quantity[FuelEfficiencyUnit]{}, ParseError{
+			Input: s,
+			Msg:   fmt.Sprintf("unknown fuel efficiency unit: %s", unitStr),
+		}
+	}
+
+	return NewFuelEfficiency(value, unit), nil
+}
+
 // FormatWithUnit formats a value with its unit symbol
 func FormatWithUnit(value float64, unitSymbol string) string {
 	return fmt.Sprintf("%g %s", value, unitSymbol)

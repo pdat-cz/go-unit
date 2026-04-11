@@ -130,3 +130,56 @@ func TestFrequencySerialization(t *testing.T) {
 		t.Errorf("Round-trip serialization failed: got %v, expected %v", freq2, freq)
 	}
 }
+
+func TestFrequencyParsing(t *testing.T) {
+	// Define test cases
+	testCases := []struct {
+		name           string
+		input          string
+		expectedValue  float64
+		expectedUnit   FrequencyUnit
+		expectedSymbol string
+	}{
+		{
+			name:           "Parse Hertz",
+			input:          "1000 Hz",
+			expectedValue:  1000.0,
+			expectedUnit:   Frequency.Hertz,
+			expectedSymbol: "Hz",
+		},
+		{
+			name:           "Parse Kilohertz",
+			input:          "2.4 kHz",
+			expectedValue:  2.4,
+			expectedUnit:   Frequency.Kilohertz,
+			expectedSymbol: "kHz",
+		},
+		{
+			name:           "Parse RPM",
+			input:          "3000 rpm",
+			expectedValue:  3000.0,
+			expectedUnit:   Frequency.RPM,
+			expectedSymbol: "rpm",
+		},
+	}
+
+	// Run test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := ParseFrequency(tc.input)
+			if err != nil {
+				t.Fatalf("Failed to parse frequency '%s': %v", tc.input, err)
+			}
+
+			if math.Abs(result.Value-tc.expectedValue) > 0.0001 {
+				t.Errorf("Parsed value incorrect: got %g, expected %g",
+					result.Value, tc.expectedValue)
+			}
+
+			if !result.Unit.Equals(tc.expectedUnit) {
+				t.Errorf("Parsed unit incorrect: got %s, expected %s",
+					result.Unit.Symbol(), tc.expectedSymbol)
+			}
+		})
+	}
+}

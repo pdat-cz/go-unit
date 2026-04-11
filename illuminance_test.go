@@ -130,3 +130,56 @@ func TestIlluminanceSerialization(t *testing.T) {
 		t.Errorf("Round-trip serialization failed: got %v, expected %v", illum2, illum)
 	}
 }
+
+func TestIlluminanceParsing(t *testing.T) {
+	// Define test cases
+	testCases := []struct {
+		name           string
+		input          string
+		expectedValue  float64
+		expectedUnit   IlluminanceUnit
+		expectedSymbol string
+	}{
+		{
+			name:           "Parse Lux",
+			input:          "500 lx",
+			expectedValue:  500.0,
+			expectedUnit:   Illuminance.Lux,
+			expectedSymbol: "lx",
+		},
+		{
+			name:           "Parse Foot-candle",
+			input:          "50 fc",
+			expectedValue:  50.0,
+			expectedUnit:   Illuminance.FootCandle,
+			expectedSymbol: "fc",
+		},
+		{
+			name:           "Parse Nox",
+			input:          "100 nx",
+			expectedValue:  100.0,
+			expectedUnit:   Illuminance.Nox,
+			expectedSymbol: "nx",
+		},
+	}
+
+	// Run test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := ParseIlluminance(tc.input)
+			if err != nil {
+				t.Fatalf("Failed to parse illuminance '%s': %v", tc.input, err)
+			}
+
+			if math.Abs(result.Value-tc.expectedValue) > 0.0001 {
+				t.Errorf("Parsed value incorrect: got %g, expected %g",
+					result.Value, tc.expectedValue)
+			}
+
+			if !result.Unit.Equals(tc.expectedUnit) {
+				t.Errorf("Parsed unit incorrect: got %s, expected %s",
+					result.Unit.Symbol(), tc.expectedSymbol)
+			}
+		})
+	}
+}

@@ -158,3 +158,56 @@ func TestFuelEfficiencySerialization(t *testing.T) {
 		t.Errorf("Round-trip serialization with L/100km failed: got %v, expected %v", fe2, fe)
 	}
 }
+
+func TestFuelEfficiencyParsing(t *testing.T) {
+	// Define test cases
+	testCases := []struct {
+		name           string
+		input          string
+		expectedValue  float64
+		expectedUnit   FuelEfficiencyUnit
+		expectedSymbol string
+	}{
+		{
+			name:           "Parse km/L",
+			input:          "10 km/L",
+			expectedValue:  10.0,
+			expectedUnit:   FuelEfficiency.KilometersPerLiter,
+			expectedSymbol: "km/L",
+		},
+		{
+			name:           "Parse mpg",
+			input:          "30 mpg",
+			expectedValue:  30.0,
+			expectedUnit:   FuelEfficiency.MilesPerGallon,
+			expectedSymbol: "mpg",
+		},
+		{
+			name:           "Parse L/100km",
+			input:          "7.5 L/100km",
+			expectedValue:  7.5,
+			expectedUnit:   FuelEfficiency.LitersPer100Kilometers,
+			expectedSymbol: "L/100km",
+		},
+	}
+
+	// Run test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := ParseFuelEfficiency(tc.input)
+			if err != nil {
+				t.Fatalf("Failed to parse fuel efficiency '%s': %v", tc.input, err)
+			}
+
+			if math.Abs(result.Value-tc.expectedValue) > 0.0001 {
+				t.Errorf("Parsed value incorrect: got %g, expected %g",
+					result.Value, tc.expectedValue)
+			}
+
+			if !result.Unit.Equals(tc.expectedUnit) {
+				t.Errorf("Parsed unit incorrect: got %s, expected %s",
+					result.Unit.Symbol(), tc.expectedSymbol)
+			}
+		})
+	}
+}

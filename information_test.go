@@ -126,3 +126,56 @@ func TestInformationSerialization(t *testing.T) {
 		t.Errorf("Expected deserialized unit to be %s, got %s", info.Unit.Symbol(), infoDeserialized.Unit.Symbol())
 	}
 }
+
+func TestInformationParsing(t *testing.T) {
+	// Define test cases
+	testCases := []struct {
+		name           string
+		input          string
+		expectedValue  float64
+		expectedUnit   InformationUnit
+		expectedSymbol string
+	}{
+		{
+			name:           "Parse Bytes",
+			input:          "1024 B",
+			expectedValue:  1024.0,
+			expectedUnit:   Information.Byte,
+			expectedSymbol: "B",
+		},
+		{
+			name:           "Parse Megabytes",
+			input:          "500 MB",
+			expectedValue:  500.0,
+			expectedUnit:   Information.Megabyte,
+			expectedSymbol: "MB",
+		},
+		{
+			name:           "Parse Kibibytes",
+			input:          "256 KiB",
+			expectedValue:  256.0,
+			expectedUnit:   Information.Kibibyte,
+			expectedSymbol: "KiB",
+		},
+	}
+
+	// Run test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := ParseInformation(tc.input)
+			if err != nil {
+				t.Fatalf("Failed to parse information '%s': %v", tc.input, err)
+			}
+
+			if result.Value != tc.expectedValue {
+				t.Errorf("Parsed value incorrect: got %g, expected %g",
+					result.Value, tc.expectedValue)
+			}
+
+			if !result.Unit.Equals(tc.expectedUnit) {
+				t.Errorf("Parsed unit incorrect: got %s, expected %s",
+					result.Unit.Symbol(), tc.expectedSymbol)
+			}
+		})
+	}
+}
