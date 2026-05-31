@@ -71,14 +71,29 @@ func ParsePressure(s string) (Quantity[PressureUnit], error) {
 	case "pa", "pascal":
 		unit = Pressure.Pascal
 		found = true
+	case "hpa", "hectopascal":
+		unit = Pressure.Hectopascal
+		found = true
 	case "kpa", "kilopascal":
 		unit = Pressure.Kilopascal
+		found = true
+	case "mpa", "megapascal":
+		unit = Pressure.Megapascal
 		found = true
 	case "bar":
 		unit = Pressure.Bar
 		found = true
+	case "mbar", "millibar":
+		unit = Pressure.Millibar
+		found = true
 	case "psi":
 		unit = Pressure.PSI
+		found = true
+	case "atm", "atmosphere", "atmospheres":
+		unit = Pressure.Atmosphere
+		found = true
+	case "mmhg", "torr", "millimeters of mercury":
+		unit = Pressure.MmHg
 		found = true
 	case "inh2o", "inh₂o", "inch water":
 		unit = Pressure.InchH2O
@@ -746,16 +761,36 @@ func ParsePower(s string) (Quantity[PowerUnit], error) {
 	var unit PowerUnit
 	found := false
 
-	switch strings.ToLower(unitStr) {
-	case "w", "watt", "watts":
-		unit = Power.Watt
+	// Case-sensitive prefix: MW (mega) vs mW (milli) collide once lowercased
+	switch unitStr {
+	case "MW":
+		unit = Power.Megawatt
 		found = true
-	case "kw", "kilowatt", "kilowatts":
-		unit = Power.Kilowatt
+	case "mW":
+		unit = Power.Milliwatt
 		found = true
-	case "btu/h", "btu/hr", "btu per hour":
-		unit = Power.BTUPerHour
-		found = true
+	}
+	if !found {
+		switch strings.ToLower(unitStr) {
+		case "w", "watt", "watts":
+			unit = Power.Watt
+			found = true
+		case "milliwatt", "milliwatts":
+			unit = Power.Milliwatt
+			found = true
+		case "kw", "kilowatt", "kilowatts":
+			unit = Power.Kilowatt
+			found = true
+		case "megawatt", "megawatts":
+			unit = Power.Megawatt
+			found = true
+		case "hp", "horsepower":
+			unit = Power.Horsepower
+			found = true
+		case "btu/h", "btu/hr", "btu per hour":
+			unit = Power.BTUPerHour
+			found = true
+		}
 	}
 
 	if !found {
@@ -783,8 +818,20 @@ func ParseFlowRate(s string) (Quantity[FlowRateUnit], error) {
 	case "m³/h", "m3/h", "cubic meters per hour", "cubic metres per hour":
 		unit = FlowRate.CubicMetersPerHour
 		found = true
+	case "m³/s", "m3/s", "cubic meters per second", "cubic metres per second":
+		unit = FlowRate.CubicMetersPerSecond
+		found = true
 	case "l/s", "liters per second", "litres per second":
 		unit = FlowRate.LitersPerSecond
+		found = true
+	case "l/min", "liters per minute", "litres per minute":
+		unit = FlowRate.LitersPerMinute
+		found = true
+	case "l/h", "liters per hour", "litres per hour":
+		unit = FlowRate.LitersPerHour
+		found = true
+	case "gpm", "gallons per minute":
+		unit = FlowRate.GallonsPerMinute
 		found = true
 	case "cfm", "cubic feet per minute":
 		unit = FlowRate.CFM

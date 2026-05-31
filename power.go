@@ -10,7 +10,10 @@ type PowerUnit struct {
 // Power contains predefined power units
 var Power = struct {
 	Watt       PowerUnit
+	Milliwatt  PowerUnit
 	Kilowatt   PowerUnit
+	Megawatt   PowerUnit
+	Horsepower PowerUnit
 	BTUPerHour PowerUnit
 }{
 	Watt: PowerUnit{
@@ -23,12 +26,42 @@ var Power = struct {
 			true, // Base unit
 		),
 	},
+	Milliwatt: PowerUnit{
+		BaseUnit: NewBaseUnit(
+			"power",
+			"mW",
+			"Milliwatt",
+			1e-3,
+			0.0,
+			false,
+		),
+	},
 	Kilowatt: PowerUnit{
 		BaseUnit: NewBaseUnit(
 			"power",
 			"kW",
 			"Kilowatt",
 			1000.0, // 1 kW = 1000 W
+			0.0,
+			false,
+		),
+	},
+	Megawatt: PowerUnit{
+		BaseUnit: NewBaseUnit(
+			"power",
+			"MW",
+			"Megawatt",
+			1e6,
+			0.0,
+			false,
+		),
+	},
+	Horsepower: PowerUnit{
+		BaseUnit: NewBaseUnit(
+			"power",
+			"hp",
+			"Horsepower",
+			745.6998715822702, // mechanical horsepower
 			0.0,
 			false,
 		),

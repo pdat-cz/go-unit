@@ -743,12 +743,22 @@ func UnmarshalPressure(data []byte) (Quantity[PressureUnit], error) {
 	switch {
 	case p.Symbol == "Pa" || p.matchUnitByKey("pascal"):
 		unit = Pressure.Pascal
+	case p.Symbol == "hPa" || p.matchUnitByKey("hectopascal"):
+		unit = Pressure.Hectopascal
 	case p.Symbol == "kPa" || p.matchUnitByKey("kilopascal"):
 		unit = Pressure.Kilopascal
+	case p.Symbol == "MPa" || p.matchUnitByKey("megapascal"):
+		unit = Pressure.Megapascal
 	case p.Symbol == "bar" || p.matchUnitByKey("bar"):
 		unit = Pressure.Bar
+	case p.Symbol == "mbar" || p.matchUnitByKey("millibar"):
+		unit = Pressure.Millibar
 	case p.Symbol == "psi" || p.matchUnitByKey("psi"):
 		unit = Pressure.PSI
+	case p.Symbol == "atm" || p.matchUnitByKey("atmosphere"):
+		unit = Pressure.Atmosphere
+	case p.Symbol == "mmHg" || p.Symbol == "Torr" || p.matchUnitByKey("millimeters_of_mercury"):
+		unit = Pressure.MmHg
 	case p.Symbol == "inH₂O" || p.Symbol == "inH2O" || p.matchUnitByKey("inch_h2o"):
 		unit = Pressure.InchH2O
 	default:
@@ -778,8 +788,16 @@ func UnmarshalFlowRate(data []byte) (Quantity[FlowRateUnit], error) {
 	switch {
 	case p.Symbol == "m³/h" || p.matchUnitByKey("cubic_meters_per_hour"):
 		unit = FlowRate.CubicMetersPerHour
+	case p.Symbol == "m³/s" || p.matchUnitByKey("cubic_meters_per_second"):
+		unit = FlowRate.CubicMetersPerSecond
 	case p.Symbol == "L/s" || p.matchUnitByKey("liters_per_second"):
 		unit = FlowRate.LitersPerSecond
+	case p.Symbol == "L/min" || p.matchUnitByKey("liters_per_minute"):
+		unit = FlowRate.LitersPerMinute
+	case p.Symbol == "L/h" || p.matchUnitByKey("liters_per_hour"):
+		unit = FlowRate.LitersPerHour
+	case p.Symbol == "GPM" || p.matchUnitByKey("us_gallons_per_minute"):
+		unit = FlowRate.GallonsPerMinute
 	case p.Symbol == "CFM" || p.matchUnitByKey("cfm"):
 		unit = FlowRate.CFM
 	default:
@@ -809,8 +827,14 @@ func UnmarshalPower(data []byte) (Quantity[PowerUnit], error) {
 	switch {
 	case p.Symbol == "W" || p.matchUnitByKey("watt"):
 		unit = Power.Watt
+	case p.Symbol == "mW" || p.matchUnitByKey("milliwatt"):
+		unit = Power.Milliwatt
 	case p.Symbol == "kW" || p.matchUnitByKey("kilowatt"):
 		unit = Power.Kilowatt
+	case p.Symbol == "MW" || p.matchUnitByKey("megawatt"):
+		unit = Power.Megawatt
+	case p.Symbol == "hp" || p.matchUnitByKey("horsepower"):
+		unit = Power.Horsepower
 	case p.Symbol == "BTU/h" || p.matchUnitByKey("btu_per_hour"):
 		unit = Power.BTUPerHour
 	default:

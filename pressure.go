@@ -9,11 +9,16 @@ type PressureUnit struct {
 
 // Pressure contains predefined pressure units
 var Pressure = struct {
-	Pascal     PressureUnit
-	Kilopascal PressureUnit
-	Bar        PressureUnit
-	PSI        PressureUnit
-	InchH2O    PressureUnit
+	Pascal      PressureUnit
+	Hectopascal PressureUnit
+	Kilopascal  PressureUnit
+	Megapascal  PressureUnit
+	Bar         PressureUnit
+	Millibar    PressureUnit
+	PSI         PressureUnit
+	Atmosphere  PressureUnit
+	MmHg        PressureUnit
+	InchH2O     PressureUnit
 }{
 	Pascal: PressureUnit{
 		BaseUnit: NewBaseUnit(
@@ -25,12 +30,32 @@ var Pressure = struct {
 			true, // Base unit
 		),
 	},
+	Hectopascal: PressureUnit{
+		BaseUnit: NewBaseUnit(
+			"pressure",
+			"hPa",
+			"Hectopascal",
+			100.0, // 1 hPa = 100 Pa
+			0.0,
+			false,
+		),
+	},
 	Kilopascal: PressureUnit{
 		BaseUnit: NewBaseUnit(
 			"pressure",
 			"kPa",
 			"Kilopascal",
 			1000.0, // 1 kPa = 1000 Pa
+			0.0,
+			false,
+		),
+	},
+	Megapascal: PressureUnit{
+		BaseUnit: NewBaseUnit(
+			"pressure",
+			"MPa",
+			"Megapascal",
+			1e6, // 1 MPa = 1,000,000 Pa
 			0.0,
 			false,
 		),
@@ -45,12 +70,42 @@ var Pressure = struct {
 			false,
 		),
 	},
+	Millibar: PressureUnit{
+		BaseUnit: NewBaseUnit(
+			"pressure",
+			"mbar",
+			"Millibar",
+			100.0, // 1 mbar = 100 Pa
+			0.0,
+			false,
+		),
+	},
 	PSI: PressureUnit{
 		BaseUnit: NewBaseUnit(
 			"pressure",
 			"psi",
 			"Pounds per Square Inch",
 			6894.76, // 1 psi = 6,894.76 Pa
+			0.0,
+			false,
+		),
+	},
+	Atmosphere: PressureUnit{
+		BaseUnit: NewBaseUnit(
+			"pressure",
+			"atm",
+			"Atmosphere",
+			101325.0, // 1 atm = 101,325 Pa
+			0.0,
+			false,
+		),
+	},
+	MmHg: PressureUnit{
+		BaseUnit: NewBaseUnit(
+			"pressure",
+			"mmHg",
+			"Millimeters of Mercury",
+			133.322387415, // 1 mmHg = 133.322387415 Pa (Torr)
 			0.0,
 			false,
 		),

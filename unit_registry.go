@@ -15,22 +15,35 @@ var temperatureUnitsBySymbol = map[string]TemperatureUnit{
 
 var pressureUnitsBySymbol = map[string]PressureUnit{
 	"Pa":    Pressure.Pascal,
+	"hPa":   Pressure.Hectopascal,
 	"kPa":   Pressure.Kilopascal,
+	"MPa":   Pressure.Megapascal,
 	"bar":   Pressure.Bar,
+	"mbar":  Pressure.Millibar,
 	"psi":   Pressure.PSI,
+	"atm":   Pressure.Atmosphere,
+	"mmHg":  Pressure.MmHg,
+	"Torr":  Pressure.MmHg,
 	"inH₂O": Pressure.InchH2O,
 	"inH2O": Pressure.InchH2O,
 }
 
 var flowRateUnitsBySymbol = map[string]FlowRateUnit{
-	"m³/h": FlowRate.CubicMetersPerHour,
-	"L/s":  FlowRate.LitersPerSecond,
-	"CFM":  FlowRate.CFM,
+	"m³/h":  FlowRate.CubicMetersPerHour,
+	"m³/s":  FlowRate.CubicMetersPerSecond,
+	"L/s":   FlowRate.LitersPerSecond,
+	"L/min": FlowRate.LitersPerMinute,
+	"L/h":   FlowRate.LitersPerHour,
+	"GPM":   FlowRate.GallonsPerMinute,
+	"CFM":   FlowRate.CFM,
 }
 
 var powerUnitsBySymbol = map[string]PowerUnit{
 	"W":     Power.Watt,
+	"mW":    Power.Milliwatt,
 	"kW":    Power.Kilowatt,
+	"MW":    Power.Megawatt,
+	"hp":    Power.Horsepower,
 	"BTU/h": Power.BTUPerHour,
 }
 

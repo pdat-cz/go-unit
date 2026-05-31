@@ -37,6 +37,34 @@ func TestEnergyConversion(t *testing.T) {
 			expectedValue:  3600000.0,
 			expectedSymbol: "J",
 		},
+		{
+			name:           "Gigajoules to Joules",
+			input:          NewEnergy(1.5, Energy.Gigajoule),
+			targetUnit:     Energy.Joule,
+			expectedValue:  1.5e9,
+			expectedSymbol: "J",
+		},
+		{
+			name:           "Joules to Gigajoules",
+			input:          NewEnergy(2.5e9, Energy.Joule),
+			targetUnit:     Energy.Gigajoule,
+			expectedValue:  2.5,
+			expectedSymbol: "GJ",
+		},
+		{
+			name:           "Gigajoules to Megajoules",
+			input:          NewEnergy(1.0, Energy.Gigajoule),
+			targetUnit:     Energy.Megajoule,
+			expectedValue:  1000.0,
+			expectedSymbol: "MJ",
+		},
+		{
+			name:           "Gigajoules to Kilowatt-hours",
+			input:          NewEnergy(1.0, Energy.Gigajoule),
+			targetUnit:     Energy.KilowattHour,
+			expectedValue:  277.7777777777778,
+			expectedSymbol: "kWh",
+		},
 	}
 
 	// Run test cases

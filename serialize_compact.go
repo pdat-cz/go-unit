@@ -19,9 +19,14 @@ var temperatureUnitsByKey = map[string]TemperatureUnit{
 
 var pressureUnitsByKey = map[string]PressureUnit{
 	"pressure_pascal":                 Pressure.Pascal,
+	"pressure_hectopascal":            Pressure.Hectopascal,
 	"pressure_kilopascal":             Pressure.Kilopascal,
+	"pressure_megapascal":             Pressure.Megapascal,
 	"pressure_bar":                    Pressure.Bar,
+	"pressure_millibar":               Pressure.Millibar,
 	"pressure_pounds_per_square_inch": Pressure.PSI,
+	"pressure_atmosphere":             Pressure.Atmosphere,
+	"pressure_millimeters_of_mercury": Pressure.MmHg,
 	"pressure_inches_of_water_column": Pressure.InchH2O,
 }
 
@@ -114,14 +119,21 @@ var accelerationUnitsByKey = map[string]AccelerationUnit{
 }
 
 var flowRateUnitsByKey = map[string]FlowRateUnit{
-	"flowrate_cubic_meters_per_hour": FlowRate.CubicMetersPerHour,
-	"flowrate_liters_per_second":     FlowRate.LitersPerSecond,
-	"flowrate_c_f_m":                 FlowRate.CFM,
+	"flowrate_cubic_meters_per_hour":   FlowRate.CubicMetersPerHour,
+	"flowrate_cubic_meters_per_second": FlowRate.CubicMetersPerSecond,
+	"flowrate_liters_per_second":       FlowRate.LitersPerSecond,
+	"flowrate_liters_per_minute":       FlowRate.LitersPerMinute,
+	"flowrate_liters_per_hour":         FlowRate.LitersPerHour,
+	"flowrate_us_gallons_per_minute":   FlowRate.GallonsPerMinute,
+	"flowrate_c_f_m":                   FlowRate.CFM,
 }
 
 var powerUnitsByKey = map[string]PowerUnit{
 	"power_watt":           Power.Watt,
+	"power_milliwatt":      Power.Milliwatt,
 	"power_kilowatt":       Power.Kilowatt,
+	"power_megawatt":       Power.Megawatt,
+	"power_horsepower":     Power.Horsepower,
 	"power_b_t_u_per_hour": Power.BTUPerHour,
 }
 
