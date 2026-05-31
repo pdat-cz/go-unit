@@ -46,10 +46,10 @@ The `Quantity` type is generic, allowing it to work with different unit types wh
 The package includes several predefined unit types:
 
 - `TemperatureUnit`: Celsius, Fahrenheit, Kelvin
-- `PressureUnit`: Pascal, Kilopascal, Bar, PSI, InchH2O
-- `FlowRateUnit`: CubicMetersPerHour, LitersPerSecond, CFM
-- `PowerUnit`: Watt, Kilowatt, BTUPerHour
-- `EnergyUnit`: Joule, KilowattHour, BTU
+- `PressureUnit`: Pascal, Hectopascal, Kilopascal, Megapascal, Bar, Millibar, PSI, Atmosphere, MmHg (Torr), InchH2O
+- `FlowRateUnit`: CubicMetersPerHour, CubicMetersPerSecond, LitersPerSecond, LitersPerMinute, LitersPerHour, GallonsPerMinute, CFM
+- `PowerUnit`: Watt, Milliwatt, Kilowatt, Megawatt, Horsepower, BTUPerHour
+- `EnergyUnit`: Joule, Kilojoule, Megajoule, Gigajoule, Terajoule, KilowattHour, BTU
 - `LengthUnit`: Meter, Kilometer, Centimeter, Millimeter, Micrometer, Nanometer, Inch, Foot, Yard, Mile
 - `MassUnit`: Kilogram, Gram, Milligram, Microgram, Pound, Ounce, Stone, MetricTon, Ton
 - `DurationUnit`: Second, Minute, Hour, Day, Millisecond, Microsecond, Nanosecond
