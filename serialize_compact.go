@@ -127,6 +127,10 @@ var powerUnitsByKey = map[string]PowerUnit{
 
 var energyUnitsByKey = map[string]EnergyUnit{
 	"energy_joule":         Energy.Joule,
+	"energy_kilojoule":     Energy.Kilojoule,
+	"energy_megajoule":     Energy.Megajoule,
+	"energy_gigajoule":     Energy.Gigajoule,
+	"energy_terajoule":     Energy.Terajoule,
 	"energy_kilowatt_hour": Energy.KilowattHour,
 	"energy_b_t_u":         Energy.BTU,
 }

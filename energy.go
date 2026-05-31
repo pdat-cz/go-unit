@@ -10,6 +10,10 @@ type EnergyUnit struct {
 // Energy contains predefined energy units
 var Energy = struct {
 	Joule        EnergyUnit
+	Kilojoule    EnergyUnit
+	Megajoule    EnergyUnit
+	Gigajoule    EnergyUnit
+	Terajoule    EnergyUnit
 	KilowattHour EnergyUnit
 	BTU          EnergyUnit
 }{
@@ -21,6 +25,46 @@ var Energy = struct {
 			1.0,
 			0.0,
 			true, // Base unit
+		),
+	},
+	Kilojoule: EnergyUnit{
+		BaseUnit: NewBaseUnit(
+			"energy",
+			"kJ",
+			"Kilojoule",
+			1e3,
+			0.0,
+			false,
+		),
+	},
+	Megajoule: EnergyUnit{
+		BaseUnit: NewBaseUnit(
+			"energy",
+			"MJ",
+			"Megajoule",
+			1e6,
+			0.0,
+			false,
+		),
+	},
+	Gigajoule: EnergyUnit{
+		BaseUnit: NewBaseUnit(
+			"energy",
+			"GJ",
+			"Gigajoule",
+			1e9,
+			0.0,
+			false,
+		),
+	},
+	Terajoule: EnergyUnit{
+		BaseUnit: NewBaseUnit(
+			"energy",
+			"TJ",
+			"Terajoule",
+			1e12,
+			0.0,
+			false,
 		),
 	},
 	KilowattHour: EnergyUnit{

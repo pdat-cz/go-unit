@@ -840,6 +840,14 @@ func UnmarshalEnergy(data []byte) (Quantity[EnergyUnit], error) {
 	switch {
 	case p.Symbol == "J" || p.matchUnitByKey("joule"):
 		unit = Energy.Joule
+	case p.Symbol == "kJ" || p.matchUnitByKey("kilojoule"):
+		unit = Energy.Kilojoule
+	case p.Symbol == "MJ" || p.matchUnitByKey("megajoule"):
+		unit = Energy.Megajoule
+	case p.Symbol == "GJ" || p.matchUnitByKey("gigajoule"):
+		unit = Energy.Gigajoule
+	case p.Symbol == "TJ" || p.matchUnitByKey("terajoule"):
+		unit = Energy.Terajoule
 	case p.Symbol == "kWh" || p.matchUnitByKey("kilowatt_hour"):
 		unit = Energy.KilowattHour
 	case p.Symbol == "BTU" || p.matchUnitByKey("btu"):

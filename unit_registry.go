@@ -36,6 +36,10 @@ var powerUnitsBySymbol = map[string]PowerUnit{
 
 var energyUnitsBySymbol = map[string]EnergyUnit{
 	"J":   Energy.Joule,
+	"kJ":  Energy.Kilojoule,
+	"MJ":  Energy.Megajoule,
+	"GJ":  Energy.Gigajoule,
+	"TJ":  Energy.Terajoule,
 	"kWh": Energy.KilowattHour,
 	"BTU": Energy.BTU,
 }

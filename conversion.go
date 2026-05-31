@@ -690,7 +690,7 @@ func ParseElectricPotentialDifference(s string) (Quantity[ElectricPotentialDiffe
 	return NewElectricPotentialDifference(value, unit), nil
 }
 
-// ParseEnergy parses a string like "100 J" into an Energy measurement
+// ParseEnergy parses a string like "1.5 GJ" into an Energy measurement
 func ParseEnergy(s string) (Quantity[EnergyUnit], error) {
 	value, unitStr, err := parseValueAndUnit(s)
 	if err != nil {
@@ -705,7 +705,19 @@ func ParseEnergy(s string) (Quantity[EnergyUnit], error) {
 	case "j", "joule", "joules":
 		unit = Energy.Joule
 		found = true
-	case "kwh", "kilowatt-hour", "kilowatt-hours", "kilowatthour", "kilowatthours":
+	case "kj", "kilojoule", "kilojoules":
+		unit = Energy.Kilojoule
+		found = true
+	case "mj", "megajoule", "megajoules":
+		unit = Energy.Megajoule
+		found = true
+	case "gj", "gigajoule", "gigajoules":
+		unit = Energy.Gigajoule
+		found = true
+	case "tj", "terajoule", "terajoules":
+		unit = Energy.Terajoule
+		found = true
+	case "kwh", "kilowatt-hour", "kilowatt-hours", "kilowatt hour", "kilowatthour", "kilowatthours":
 		unit = Energy.KilowattHour
 		found = true
 	case "btu", "british thermal unit", "british thermal units":
